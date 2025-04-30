@@ -1,0 +1,105 @@
+
+import React, { useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { Button } from "@/components/ui/button";
+import { Menu, X } from 'lucide-react';
+
+const Navbar = () => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const location = useLocation();
+  
+  const toggleMenu = () => {
+    setIsMenuOpen(!isMenuOpen);
+  };
+
+  const links = [
+    { title: "Dashboard", href: "/dashboard" },
+    { title: "Mint NFT", href: "/mint" },
+    { title: "Leaderboard", href: "/leaderboard" },
+    { title: "Crew", href: "/crew" }
+  ];
+
+  const isActive = (path: string) => {
+    return location.pathname === path;
+  };
+
+  return (
+    <header className="sticky top-0 w-full bg-white border-b border-corepulse-gray-200 z-50">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-16">
+          {/* Logo */}
+          <Link to="/" className="flex items-center space-x-2">
+            <div className="h-8 w-8 rounded-full bg-corepulse-orange flex items-center justify-center">
+              <div className="h-4 w-4 bg-white rounded-full"></div>
+            </div>
+            <span className="font-bold text-xl text-corepulse-gray-900">CorePulse</span>
+          </Link>
+          
+          {/* Desktop Navigation */}
+          <nav className="hidden md:flex items-center space-x-4">
+            {links.map((link) => (
+              <Link 
+                key={link.href} 
+                to={link.href} 
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  isActive(link.href)
+                    ? "text-corepulse-orange border-b-2 border-corepulse-orange"
+                    : "text-corepulse-gray-600 hover:text-corepulse-orange"
+                }`}
+              >
+                {link.title}
+              </Link>
+            ))}
+            <Button className="ml-4 bg-corepulse-orange hover:bg-corepulse-orange-hover transition-colors">
+              Connect Wallet
+            </Button>
+          </nav>
+
+          {/* Mobile Navigation Button */}
+          <div className="md:hidden">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={toggleMenu} 
+              className="text-corepulse-gray-700"
+            >
+              {isMenuOpen ? <X /> : <Menu />}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Menu */}
+      {isMenuOpen && (
+        <div className="md:hidden">
+          <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-white">
+            {links.map((link) => (
+              <Link 
+                key={link.href} 
+                to={link.href} 
+                className={`block px-3 py-2 rounded-md text-base font-medium ${
+                  isActive(link.href)
+                    ? "text-corepulse-orange bg-corepulse-gray-100"
+                    : "text-corepulse-gray-600 hover:text-corepulse-orange hover:bg-corepulse-gray-100"
+                }`}
+                onClick={() => setIsMenuOpen(false)}
+              >
+                {link.title}
+              </Link>
+            ))}
+            <div className="pt-2">
+              <Button 
+                className="w-full bg-corepulse-orange hover:bg-corepulse-orange-hover transition-colors"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Connect Wallet
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </header>
+  );
+};
+
+export default Navbar;

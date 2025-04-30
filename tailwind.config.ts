@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,7 +62,23 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
-				}
+				},
+                // CorePulse Custom Colors
+                corepulse: {
+                    orange: '#FFA500',
+                    'orange-hover': '#FF8C00',
+                    'orange-light': '#FFD700',
+                    white: '#FFFFFF',
+                    'gray-100': '#F3F4F6',
+                    'gray-200': '#E5E7EB',
+                    'gray-300': '#D1D5DB',
+                    'gray-400': '#9CA3AF',
+                    'gray-500': '#6B7280',
+                    'gray-600': '#4B5563',
+                    'gray-700': '#374151',
+                    'gray-800': '#1F2937',
+                    'gray-900': '#111827'
+                }
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
@@ -84,11 +101,27 @@ export default {
 					to: {
 						height: '0'
 					}
-				}
+				},
+                'pulse-wave': {
+                    '0%': { transform: 'scale(0.95)', opacity: '1' },
+                    '70%': { transform: 'scale(1.1)', opacity: '0.3' },
+                    '100%': { transform: 'scale(1.2)', opacity: '0' }
+                },
+                'float': {
+                    '0%, 100%': { transform: 'translateY(0)' },
+                    '50%': { transform: 'translateY(-10px)' }
+                },
+                'glow': {
+                    '0%, 100%': { opacity: '0.6' },
+                    '50%': { opacity: '1' }
+                }
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+                'pulse-wave': 'pulse-wave 2s infinite',
+                'float': 'float 3s ease-in-out infinite',
+                'glow': 'glow 2s ease-in-out infinite'
 			}
 		}
 	},

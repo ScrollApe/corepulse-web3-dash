@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -98,4 +99,28 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+.pulse-container {
+  position: relative;
+}
+
+.pulse-circle {
+  position: absolute;
+  border-radius: 50%;
+  background-color: rgba(255, 165, 0, 0.3);
+  z-index: 0;
+}
+
+.button-pulse:hover::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: inherit;
+  background-color: rgba(255, 165, 0, 0.2);
+  animation: pulse-wave 1.5s infinite;
+  z-index: -1;
 }
