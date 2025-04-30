@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Wallet } from 'lucide-react';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -16,7 +16,8 @@ const Navbar = () => {
     { title: "Dashboard", href: "/dashboard" },
     { title: "Mint NFT", href: "/mint" },
     { title: "Leaderboard", href: "/leaderboard" },
-    { title: "Crew", href: "/crew" }
+    { title: "Crew", href: "/crew" },
+    { title: "Lore & Challenges", href: "/lore" }
   ];
 
   const isActive = (path: string) => {
@@ -24,11 +25,11 @@ const Navbar = () => {
   };
 
   return (
-    <header className="sticky top-0 w-full bg-white border-b border-corepulse-gray-200 z-50">
+    <header className="sticky top-0 w-full bg-white border-b border-corepulse-gray-200 z-50 shadow-sm">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2">
+          <Link to="/" className="flex items-center space-x-2 shrink-0">
             <div className="h-8 w-8 rounded-full bg-corepulse-orange flex items-center justify-center">
               <div className="h-4 w-4 bg-white rounded-full"></div>
             </div>
@@ -44,14 +45,15 @@ const Navbar = () => {
                 className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                   isActive(link.href)
                     ? "text-corepulse-orange border-b-2 border-corepulse-orange"
-                    : "text-corepulse-gray-600 hover:text-corepulse-orange"
+                    : "text-corepulse-gray-600 hover:text-corepulse-orange hover:border-b-2 hover:border-corepulse-orange-light"
                 }`}
               >
                 {link.title}
               </Link>
             ))}
-            <Button className="ml-4 bg-corepulse-orange hover:bg-corepulse-orange-hover transition-colors">
-              Connect Wallet
+            <Button className="ml-4 bg-corepulse-orange hover:bg-corepulse-orange-hover transition-colors flex items-center gap-2">
+              <Wallet className="w-4 h-4" />
+              <span>Connect Wallet</span>
             </Button>
           </nav>
 
@@ -89,10 +91,11 @@ const Navbar = () => {
             ))}
             <div className="pt-2">
               <Button 
-                className="w-full bg-corepulse-orange hover:bg-corepulse-orange-hover transition-colors"
+                className="w-full bg-corepulse-orange hover:bg-corepulse-orange-hover transition-colors flex items-center justify-center gap-2"
                 onClick={() => setIsMenuOpen(false)}
               >
-                Connect Wallet
+                <Wallet className="w-4 h-4" />
+                <span>Connect Wallet</span>
               </Button>
             </div>
           </div>
