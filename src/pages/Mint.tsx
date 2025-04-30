@@ -76,134 +76,134 @@ const Mint = () => {
             <TabsTrigger value="available">Available NFTs</TabsTrigger>
             <TabsTrigger value="owned">Your Collection</TabsTrigger>
           </TabsList>
-        </Tabs>
-        
-        <TabsContent value="available" className="mt-0">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {nftTiers.map((nft, index) => (
-              <NFTCard
-                key={index}
-                tier={nft.tier as 'Bronze' | 'Silver' | 'Gold'}
-                boost={nft.boost}
-                price={nft.price}
-                image={nft.image}
-                minted={nft.minted}
-                totalSupply={nft.totalSupply}
-              />
-            ))}
-          </div>
           
-          <Card className="mt-8 border-2">
-            <CardHeader>
-              <CardTitle>NFT Benefits</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <p className="text-corepulse-gray-700">
-                  CorePulse NFTs provide permanent mining boosts to your account. The higher the tier, the greater the boost.
-                </p>
-                
-                <div className="bg-corepulse-gray-100 p-4 rounded-md">
-                  <h3 className="font-semibold text-lg mb-2">Boost Stacking</h3>
-                  <p className="text-corepulse-gray-700">
-                    You can stack multiple NFT boosts! Each NFT you own adds its boost percentage to your total mining rate.
-                  </p>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-                  <div className="p-4 border border-corepulse-gray-200 rounded-md text-center">
-                    <div className="w-10 h-10 rounded-full bg-amber-600 mx-auto mb-2"></div>
-                    <h4 className="font-semibold">Bronze</h4>
-                    <p className="text-corepulse-orange font-bold">+5% Mining Rate</p>
-                  </div>
-                  
-                  <div className="p-4 border border-corepulse-gray-200 rounded-md text-center">
-                    <div className="w-10 h-10 rounded-full bg-gray-400 mx-auto mb-2"></div>
-                    <h4 className="font-semibold">Silver</h4>
-                    <p className="text-corepulse-orange font-bold">+10% Mining Rate</p>
-                  </div>
-                  
-                  <div className="p-4 border border-corepulse-gray-200 rounded-md text-center">
-                    <div className="w-10 h-10 rounded-full bg-yellow-400 mx-auto mb-2"></div>
-                    <h4 className="font-semibold">Gold</h4>
-                    <p className="text-corepulse-orange font-bold">+20% Mining Rate</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="owned" className="mt-0">
-          <div className="bg-corepulse-gray-100 p-4 rounded-lg mb-6">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-              <div>
-                <h3 className="font-semibold text-lg">Your NFT Collection</h3>
-                <p className="text-corepulse-gray-600">You own {ownedNFTs.length} CorePulse NFTs</p>
-              </div>
-              <div className="mt-2 md:mt-0">
-                <Badge className="bg-corepulse-orange hover:bg-corepulse-orange-hover text-white">
-                  Total Boost: +15%
-                </Badge>
-              </div>
-            </div>
-          </div>
-          
-          {ownedNFTs.length > 0 ? (
+          <TabsContent value="available" className="mt-0">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {ownedNFTs.map((nft, index) => (
-                <Card key={index} className="overflow-hidden border-2">
-                  <div className={`h-3 w-full ${
-                    nft.tier === 'Bronze' 
-                      ? 'bg-gradient-to-b from-amber-600 to-amber-800'
-                      : nft.tier === 'Silver'
-                        ? 'bg-gradient-to-b from-gray-300 to-gray-500'
-                        : 'bg-gradient-to-b from-yellow-300 to-yellow-500'
-                  }`}></div>
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle>{nft.tier} Booster</CardTitle>
-                        <p className="text-sm text-corepulse-gray-500">ID: {nft.id}</p>
-                      </div>
-                      <Badge className="bg-corepulse-orange hover:bg-corepulse-orange-hover text-white">
-                        +{nft.boost} Boost
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex justify-center mb-4">
-                      <div className={`w-24 h-24 rounded-full ${
-                        nft.tier === 'Bronze' 
-                          ? 'bg-gradient-to-b from-amber-600 to-amber-800'
-                          : nft.tier === 'Silver'
-                            ? 'bg-gradient-to-b from-gray-300 to-gray-500'
-                            : 'bg-gradient-to-b from-yellow-300 to-yellow-500'
-                      } flex items-center justify-center p-1`}>
-                        <div className="bg-white w-full h-full rounded-full flex items-center justify-center">
-                          <img 
-                            src={nft.image} 
-                            alt={`${nft.tier} NFT`} 
-                            className="w-20 h-20 object-contain" 
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    <p className="text-center text-sm text-corepulse-gray-600">
-                      Minted on {new Date(nft.mintDate).toLocaleDateString()}
-                    </p>
-                  </CardContent>
-                </Card>
+              {nftTiers.map((nft, index) => (
+                <NFTCard
+                  key={index}
+                  tier={nft.tier as 'Bronze' | 'Silver' | 'Gold'}
+                  boost={nft.boost}
+                  price={nft.price}
+                  image={nft.image}
+                  minted={nft.minted}
+                  totalSupply={nft.totalSupply}
+                />
               ))}
             </div>
-          ) : (
-            <div className="text-center py-12">
-              <p className="text-lg text-corepulse-gray-600">
-                You don't own any NFTs yet. Mint one to boost your mining rate!
-              </p>
+            
+            <Card className="mt-8 border-2">
+              <CardHeader>
+                <CardTitle>NFT Benefits</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <p className="text-corepulse-gray-700">
+                    CorePulse NFTs provide permanent mining boosts to your account. The higher the tier, the greater the boost.
+                  </p>
+                  
+                  <div className="bg-corepulse-gray-100 p-4 rounded-md">
+                    <h3 className="font-semibold text-lg mb-2">Boost Stacking</h3>
+                    <p className="text-corepulse-gray-700">
+                      You can stack multiple NFT boosts! Each NFT you own adds its boost percentage to your total mining rate.
+                    </p>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                    <div className="p-4 border border-corepulse-gray-200 rounded-md text-center">
+                      <div className="w-10 h-10 rounded-full bg-amber-600 mx-auto mb-2"></div>
+                      <h4 className="font-semibold">Bronze</h4>
+                      <p className="text-corepulse-orange font-bold">+5% Mining Rate</p>
+                    </div>
+                    
+                    <div className="p-4 border border-corepulse-gray-200 rounded-md text-center">
+                      <div className="w-10 h-10 rounded-full bg-gray-400 mx-auto mb-2"></div>
+                      <h4 className="font-semibold">Silver</h4>
+                      <p className="text-corepulse-orange font-bold">+10% Mining Rate</p>
+                    </div>
+                    
+                    <div className="p-4 border border-corepulse-gray-200 rounded-md text-center">
+                      <div className="w-10 h-10 rounded-full bg-yellow-400 mx-auto mb-2"></div>
+                      <h4 className="font-semibold">Gold</h4>
+                      <p className="text-corepulse-orange font-bold">+20% Mining Rate</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="owned" className="mt-0">
+            <div className="bg-corepulse-gray-100 p-4 rounded-lg mb-6">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h3 className="font-semibold text-lg">Your NFT Collection</h3>
+                  <p className="text-corepulse-gray-600">You own {ownedNFTs.length} CorePulse NFTs</p>
+                </div>
+                <div className="mt-2 md:mt-0">
+                  <Badge className="bg-corepulse-orange hover:bg-corepulse-orange-hover text-white">
+                    Total Boost: +15%
+                  </Badge>
+                </div>
+              </div>
             </div>
-          )}
-        </TabsContent>
+            
+            {ownedNFTs.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {ownedNFTs.map((nft, index) => (
+                  <Card key={index} className="overflow-hidden border-2">
+                    <div className={`h-3 w-full ${
+                      nft.tier === 'Bronze' 
+                        ? 'bg-gradient-to-b from-amber-600 to-amber-800'
+                        : nft.tier === 'Silver'
+                          ? 'bg-gradient-to-b from-gray-300 to-gray-500'
+                          : 'bg-gradient-to-b from-yellow-300 to-yellow-500'
+                    }`}></div>
+                    <CardHeader>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle>{nft.tier} Booster</CardTitle>
+                          <p className="text-sm text-corepulse-gray-500">ID: {nft.id}</p>
+                        </div>
+                        <Badge className="bg-corepulse-orange hover:bg-corepulse-orange-hover text-white">
+                          +{nft.boost} Boost
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex justify-center mb-4">
+                        <div className={`w-24 h-24 rounded-full ${
+                          nft.tier === 'Bronze' 
+                            ? 'bg-gradient-to-b from-amber-600 to-amber-800'
+                            : nft.tier === 'Silver'
+                              ? 'bg-gradient-to-b from-gray-300 to-gray-500'
+                              : 'bg-gradient-to-b from-yellow-300 to-yellow-500'
+                        } flex items-center justify-center p-1`}>
+                          <div className="bg-white w-full h-full rounded-full flex items-center justify-center">
+                            <img 
+                              src={nft.image} 
+                              alt={`${nft.tier} NFT`} 
+                              className="w-20 h-20 object-contain" 
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-center text-sm text-corepulse-gray-600">
+                        Minted on {new Date(nft.mintDate).toLocaleDateString()}
+                      </p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-lg text-corepulse-gray-600">
+                  You don't own any NFTs yet. Mint one to boost your mining rate!
+                </p>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </Layout>
   );
