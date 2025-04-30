@@ -71,40 +71,60 @@ const EarningsCard = () => {
               <TabsTrigger value="weekly">Weekly</TabsTrigger>
               <TabsTrigger value="monthly">Monthly</TabsTrigger>
             </TabsList>
+            <TabsContent value="daily">
+              <ChartContent data={data} total={total} period="daily" />
+            </TabsContent>
+            <TabsContent value="weekly">
+              <ChartContent data={data} total={total} period="weekly" />
+            </TabsContent>
+            <TabsContent value="monthly">
+              <ChartContent data={data} total={total} period="monthly" />
+            </TabsContent>
           </Tabs>
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart
-              data={data}
-              margin={{
-                top: 10,
-                right: 10,
-                left: 0,
-                bottom: 0,
-              }}
-            >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Area 
-                type="monotone" 
-                dataKey="value" 
-                stroke="#FFA500" 
-                fill="rgba(255, 165, 0, 0.2)" 
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="mt-4 text-center">
-          <p className="text-sm text-corepulse-gray-600">Total {tab} earnings</p>
-          <p className="text-2xl font-bold">{total.toFixed(2)} $CORE</p>
-        </div>
-      </CardContent>
     </Card>
+  );
+};
+
+interface ChartContentProps {
+  data: { name: string; value: number }[];
+  total: number;
+  period: string;
+}
+
+const ChartContent: React.FC<ChartContentProps> = ({ data, total, period }) => {
+  return (
+    <CardContent>
+      <div className="h-64">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart
+            data={data}
+            margin={{
+              top: 10,
+              right: 10,
+              left: 0,
+              bottom: 0,
+            }}
+          >
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" />
+            <YAxis />
+            <Tooltip />
+            <Area 
+              type="monotone" 
+              dataKey="value" 
+              stroke="#FFA500" 
+              fill="rgba(255, 165, 0, 0.2)" 
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="mt-4 text-center">
+        <p className="text-sm text-corepulse-gray-600">Total {period} earnings</p>
+        <p className="text-2xl font-bold">{total.toFixed(2)} $CORE</p>
+      </div>
+    </CardContent>
   );
 };
 
