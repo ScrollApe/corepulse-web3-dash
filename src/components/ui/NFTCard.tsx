@@ -1,7 +1,11 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAccount } from 'wagmi';
+import { toast } from '@/components/ui/sonner';
+import { Progress } from "@/components/ui/progress";
+import { Loader } from "lucide-react";
 
 interface NFTCardProps {
   tier: 'Bronze' | 'Silver' | 'Gold';
@@ -13,6 +17,8 @@ interface NFTCardProps {
 }
 
 const NFTCard: React.FC<NFTCardProps> = ({ tier, boost, price, image, minted, totalSupply }) => {
+  const { isConnected } = useAccount();
+  const [isMinting, setIsMinting] = useState(false);
   
   const getBgColor = () => {
     switch (tier) {
@@ -26,6 +32,45 @@ const NFTCard: React.FC<NFTCardProps> = ({ tier, boost, price, image, minted, to
         return 'bg-gradient-to-b from-amber-600 to-amber-800';
     }
   };
+  
+  const handleMint = async () => {
+    if (!isConnected) {
+      toast({
+        title: "Wallet not connected",
+        description: "Please connect your wallet to mint NFTs",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsMinting(true);
+    
+    try {
+      // Simulate minting process
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      toast({
+        title: "NFT Minted!",
+        description: `You have successfully minted a ${tier} NFT!`,
+        variant: "default",
+      });
+      
+      // In a real app, we would call the contract here
+      // const tx = await contract.mint(tier);
+      // await tx.wait();
+    } catch (error) {
+      console.error("Mint error:", error);
+      toast({
+        title: "Mint Failed",
+        description: "Failed to mint NFT. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsMinting(false);
+    }
+  };
+  
+  const percentMinted = (minted / totalSupply) * 100;
   
   return (
     <Card className="overflow-hidden border-2 hover:shadow-lg transition-all duration-300">
@@ -48,18 +93,24 @@ const NFTCard: React.FC<NFTCardProps> = ({ tier, boost, price, image, minted, to
         </div>
         <div className="text-center">
           <p className="font-semibold text-lg mb-2">{price}</p>
-          <div className="w-full bg-corepulse-gray-200 rounded-full h-2.5">
-            <div 
-              className="bg-corepulse-orange h-2.5 rounded-full" 
-              style={{ width: `${(minted / totalSupply) * 100}%` }}
-            ></div>
-          </div>
+          <Progress value={percentMinted} className="h-2" />
           <p className="text-sm text-corepulse-gray-600 mt-2">{minted} / {totalSupply} minted</p>
         </div>
       </CardContent>
       <CardFooter>
-        <Button className="w-full bg-corepulse-orange hover:bg-corepulse-orange-hover transition-colors relative button-pulse">
-          Mint NFT
+        <Button 
+          className="w-full bg-corepulse-orange hover:bg-corepulse-orange-hover transition-colors relative button-pulse"
+          onClick={handleMint}
+          disabled={isMinting}
+        >
+          {isMinting ? (
+            <>
+              <Loader className="animate-spin mr-2" size={16} />
+              Minting...
+            </>
+          ) : (
+            "Mint NFT"
+          )}
         </Button>
       </CardFooter>
     </Card>

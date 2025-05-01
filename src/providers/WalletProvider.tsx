@@ -6,6 +6,7 @@ import { mainnet, arbitrum } from 'wagmi/chains';
 import { publicProvider } from 'wagmi/providers/public';
 import { InjectedConnector } from 'wagmi/connectors/injected';
 import { WalletConnectConnector } from 'wagmi/connectors/walletConnect';
+import { toast } from '@/components/ui/sonner';
 
 // Configure chains & providers
 const { chains, publicClient, webSocketPublicClient } = configureChains(
@@ -36,9 +37,7 @@ const modal = createWeb3Modal({
   chains,
   themeMode: 'light',
   themeVariables: {
-    // Use correct theme variable names supported by web3modal
     '--w3m-accent': '#FF6B00', // CorePulse orange
-    '--w3m-background': '#FF6B00',
   }
 });
 
@@ -55,6 +54,24 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 // Utility hook to connect wallet
 export function useWalletConnect() {
   return {
-    connect: () => modal.open(),
+    connect: () => {
+      try {
+        modal.open();
+      } catch (error) {
+        console.error("Failed to connect wallet:", error);
+        toast({
+          title: "Connection Failed",
+          description: "Failed to connect wallet. Please try again.",
+          variant: "destructive",
+        });
+      }
+    },
+    disconnect: () => {
+      try {
+        modal.close();
+      } catch (error) {
+        console.error("Failed to disconnect wallet:", error);
+      }
+    }
   };
 }

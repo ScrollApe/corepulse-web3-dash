@@ -1,13 +1,19 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from '@/components/layout/Layout';
 import NFTCard from '@/components/ui/NFTCard';
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAccount } from 'wagmi';
+import { useWalletConnect } from '@/providers/WalletProvider';
+import { Button } from "@/components/ui/button";
+import { Wallet } from "lucide-react";
 
 const Mint = () => {
   const [tab, setTab] = useState("available");
+  const { address, isConnected } = useAccount();
+  const { connect } = useWalletConnect();
   
   const nftTiers = [
     {
@@ -37,7 +43,7 @@ const Mint = () => {
   ];
   
   // Sample user NFTs
-  const ownedNFTs = [
+  const [ownedNFTs, setOwnedNFTs] = useState([
     {
       id: 'nft123',
       tier: 'Bronze',
@@ -52,7 +58,21 @@ const Mint = () => {
       image: 'https://api.dicebear.com/7.x/identicon/svg?seed=456',
       mintDate: '2023-12-05'
     }
-  ];
+  ]);
+
+  // Format wallet address for display
+  const formatAddress = (address?: string) => {
+    if (!address) return '';
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  };
+  
+  // Calculate total boost
+  const calculateTotalBoost = () => {
+    return ownedNFTs.reduce((total, nft) => {
+      const boostValue = parseInt(nft.boost, 10);
+      return total + boostValue;
+    }, 0);
+  };
   
   return (
     <Layout>
@@ -64,9 +84,20 @@ const Mint = () => {
               Mint CorePulse NFTs to boost your mining power
             </p>
           </div>
-          <div className="mt-4 md:mt-0">
+          <div className="mt-4 md:mt-0 flex flex-col md:flex-row gap-3">
+            {!isConnected && (
+              <Button 
+                className="bg-corepulse-orange hover:bg-corepulse-orange-hover w-full md:w-auto"
+                onClick={connect}
+              >
+                <Wallet className="mr-2" size={16} />
+                Connect Wallet
+              </Button>
+            )}
             <Badge className="bg-corepulse-orange hover:bg-corepulse-orange-hover text-white">
-              Wallet Balance: 1,245 $CORE
+              {isConnected 
+                ? `Wallet: ${formatAddress(address)} | Balance: 1,245 $CORE` 
+                : "Wallet Balance: 0 $CORE"}
             </Badge>
           </div>
         </div>
@@ -142,64 +173,85 @@ const Mint = () => {
                 </div>
                 <div className="mt-2 md:mt-0">
                   <Badge className="bg-corepulse-orange hover:bg-corepulse-orange-hover text-white">
-                    Total Boost: +15%
+                    Total Boost: +{calculateTotalBoost()}%
                   </Badge>
                 </div>
               </div>
             </div>
             
-            {ownedNFTs.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {ownedNFTs.map((nft, index) => (
-                  <Card key={index} className="overflow-hidden border-2">
-                    <div className={`h-3 w-full ${
-                      nft.tier === 'Bronze' 
-                        ? 'bg-gradient-to-b from-amber-600 to-amber-800'
-                        : nft.tier === 'Silver'
-                          ? 'bg-gradient-to-b from-gray-300 to-gray-500'
-                          : 'bg-gradient-to-b from-yellow-300 to-yellow-500'
-                    }`}></div>
-                    <CardHeader>
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle>{nft.tier} Booster</CardTitle>
-                          <p className="text-sm text-corepulse-gray-500">ID: {nft.id}</p>
+            {isConnected ? (
+              ownedNFTs.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {ownedNFTs.map((nft, index) => (
+                    <Card key={index} className="overflow-hidden border-2">
+                      <div className={`h-3 w-full ${
+                        nft.tier === 'Bronze' 
+                          ? 'bg-gradient-to-b from-amber-600 to-amber-800'
+                          : nft.tier === 'Silver'
+                            ? 'bg-gradient-to-b from-gray-300 to-gray-500'
+                            : 'bg-gradient-to-b from-yellow-300 to-yellow-500'
+                      }`}></div>
+                      <CardHeader>
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <CardTitle>{nft.tier} Booster</CardTitle>
+                            <p className="text-sm text-corepulse-gray-500">ID: {nft.id}</p>
+                          </div>
+                          <Badge className="bg-corepulse-orange hover:bg-corepulse-orange-hover text-white">
+                            +{nft.boost} Boost
+                          </Badge>
                         </div>
-                        <Badge className="bg-corepulse-orange hover:bg-corepulse-orange-hover text-white">
-                          +{nft.boost} Boost
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex justify-center mb-4">
-                        <div className={`w-24 h-24 rounded-full ${
-                          nft.tier === 'Bronze' 
-                            ? 'bg-gradient-to-b from-amber-600 to-amber-800'
-                            : nft.tier === 'Silver'
-                              ? 'bg-gradient-to-b from-gray-300 to-gray-500'
-                              : 'bg-gradient-to-b from-yellow-300 to-yellow-500'
-                        } flex items-center justify-center p-1`}>
-                          <div className="bg-white w-full h-full rounded-full flex items-center justify-center">
-                            <img 
-                              src={nft.image} 
-                              alt={`${nft.tier} NFT`} 
-                              className="w-20 h-20 object-contain" 
-                            />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex justify-center mb-4">
+                          <div className={`w-24 h-24 rounded-full ${
+                            nft.tier === 'Bronze' 
+                              ? 'bg-gradient-to-b from-amber-600 to-amber-800'
+                              : nft.tier === 'Silver'
+                                ? 'bg-gradient-to-b from-gray-300 to-gray-500'
+                                : 'bg-gradient-to-b from-yellow-300 to-yellow-500'
+                          } flex items-center justify-center p-1`}>
+                            <div className="bg-white w-full h-full rounded-full flex items-center justify-center">
+                              <img 
+                                src={nft.image} 
+                                alt={`${nft.tier} NFT`} 
+                                className="w-20 h-20 object-contain" 
+                              />
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <p className="text-center text-sm text-corepulse-gray-600">
-                        Minted on {new Date(nft.mintDate).toLocaleDateString()}
-                      </p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                        <p className="text-center text-sm text-corepulse-gray-600">
+                          Minted on {new Date(nft.mintDate).toLocaleDateString()}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <p className="text-lg text-corepulse-gray-600">
+                    You don't own any NFTs yet. Mint one to boost your mining rate!
+                  </p>
+                  <Button 
+                    className="mt-4 bg-corepulse-orange hover:bg-corepulse-orange-hover"
+                    onClick={() => setTab("available")}
+                  >
+                    Browse Available NFTs
+                  </Button>
+                </div>
+              )
             ) : (
               <div className="text-center py-12">
                 <p className="text-lg text-corepulse-gray-600">
-                  You don't own any NFTs yet. Mint one to boost your mining rate!
+                  Connect your wallet to view your NFTs
                 </p>
+                <Button 
+                  className="mt-4 bg-corepulse-orange hover:bg-corepulse-orange-hover"
+                  onClick={connect}
+                >
+                  <Wallet className="mr-2" size={16} />
+                  Connect Wallet
+                </Button>
               </div>
             )}
           </TabsContent>
