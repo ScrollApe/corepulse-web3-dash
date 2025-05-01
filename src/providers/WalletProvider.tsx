@@ -22,7 +22,7 @@ const config = createConfig({
     new WalletConnectConnector({
       chains,
       options: {
-        projectId: 'YOUR_PROJECT_ID', // Replace with your WalletConnect Project ID if needed
+        projectId: '535acf9f46f8f279f492a746b1ec219a', // Replace with your WalletConnect Project ID if needed
       },
     }),
   ],
@@ -33,7 +33,7 @@ const config = createConfig({
 // Create Web3Modal
 const modal = createWeb3Modal({ 
   wagmiConfig: config, 
-  projectId: 'YOUR_PROJECT_ID',  // Replace with your WalletConnect Project ID
+  projectId: '535acf9f46f8f279f492a746b1ec219a',  // Replace with your WalletConnect Project ID
   chains,
   themeMode: 'light',
   themeVariables: {
