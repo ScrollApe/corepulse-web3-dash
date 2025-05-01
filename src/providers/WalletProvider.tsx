@@ -36,8 +36,9 @@ const modal = createWeb3Modal({
   chains,
   themeMode: 'light',
   themeVariables: {
-    '--w3m-accent-color': '#FF6B00', // Use CorePulse orange
-    '--w3m-background-color': '#FF6B00',
+    // Use correct theme variable names supported by web3modal
+    '--w3m-accent': '#FF6B00', // CorePulse orange
+    '--w3m-background': '#FF6B00',
   }
 });
 
