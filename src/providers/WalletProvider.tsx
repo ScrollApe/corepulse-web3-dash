@@ -61,7 +61,6 @@ export function useWalletConnect() {
         console.error("Failed to connect wallet:", error);
         toast("Connection Failed", {
           description: "Failed to connect wallet. Please try again.",
-          variant: "destructive",
         });
       }
     },

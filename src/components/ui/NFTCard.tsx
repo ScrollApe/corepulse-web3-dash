@@ -37,7 +37,6 @@ const NFTCard: React.FC<NFTCardProps> = ({ tier, boost, price, image, minted, to
     if (!isConnected) {
       toast("Wallet not connected", {
         description: "Please connect your wallet to mint NFTs",
-        variant: "destructive",
       });
       return;
     }
@@ -50,7 +49,6 @@ const NFTCard: React.FC<NFTCardProps> = ({ tier, boost, price, image, minted, to
       
       toast("NFT Minted!", {
         description: `You have successfully minted a ${tier} NFT!`,
-        variant: "default",
       });
       
       // In a real app, we would call the contract here
@@ -60,7 +58,6 @@ const NFTCard: React.FC<NFTCardProps> = ({ tier, boost, price, image, minted, to
       console.error("Mint error:", error);
       toast("Mint Failed", {
         description: "Failed to mint NFT. Please try again.",
-        variant: "destructive",
       });
     } finally {
       setIsMinting(false);
