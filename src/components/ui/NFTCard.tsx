@@ -35,8 +35,7 @@ const NFTCard: React.FC<NFTCardProps> = ({ tier, boost, price, image, minted, to
   
   const handleMint = async () => {
     if (!isConnected) {
-      toast({
-        title: "Wallet not connected",
+      toast("Wallet not connected", {
         description: "Please connect your wallet to mint NFTs",
         variant: "destructive",
       });
@@ -49,8 +48,7 @@ const NFTCard: React.FC<NFTCardProps> = ({ tier, boost, price, image, minted, to
       // Simulate minting process
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      toast({
-        title: "NFT Minted!",
+      toast("NFT Minted!", {
         description: `You have successfully minted a ${tier} NFT!`,
         variant: "default",
       });
@@ -60,8 +58,7 @@ const NFTCard: React.FC<NFTCardProps> = ({ tier, boost, price, image, minted, to
       // await tx.wait();
     } catch (error) {
       console.error("Mint error:", error);
-      toast({
-        title: "Mint Failed",
+      toast("Mint Failed", {
         description: "Failed to mint NFT. Please try again.",
         variant: "destructive",
       });

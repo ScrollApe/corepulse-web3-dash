@@ -59,8 +59,7 @@ export function useWalletConnect() {
         modal.open();
       } catch (error) {
         console.error("Failed to connect wallet:", error);
-        toast({
-          title: "Connection Failed",
+        toast("Connection Failed", {
           description: "Failed to connect wallet. Please try again.",
           variant: "destructive",
         });
