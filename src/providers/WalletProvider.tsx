@@ -1,11 +1,11 @@
 
+import { useState, useEffect } from 'react';
 import { createWeb3Modal } from '@web3modal/wagmi';
-import { WagmiConfig, createConfig } from 'wagmi';
+import { WagmiConfig, createConfig, configureChains } from 'wagmi';
 import { mainnet, arbitrum } from 'wagmi/chains';
 import { publicProvider } from 'wagmi/providers/public';
 import { InjectedConnector } from 'wagmi/connectors/injected';
 import { WalletConnectConnector } from 'wagmi/connectors/walletConnect';
-import { useState, useEffect } from 'react';
 
 // Configure chains & providers
 const { chains, publicClient, webSocketPublicClient } = configureChains(
@@ -40,9 +40,6 @@ const modal = createWeb3Modal({
     '--w3m-background-color': '#FF6B00',
   }
 });
-
-// Import configureChains which was missing
-import { configureChains } from 'wagmi';
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
