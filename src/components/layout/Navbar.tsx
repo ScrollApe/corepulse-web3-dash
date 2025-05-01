@@ -3,10 +3,14 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Menu, X, Wallet } from 'lucide-react';
+import { useWalletConnect } from '@/providers/WalletProvider';
+import { useAccount } from 'wagmi';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
+  const { connect } = useWalletConnect();
+  const { address, isConnected } = useAccount();
   
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -22,6 +26,12 @@ const Navbar = () => {
 
   const isActive = (path: string) => {
     return location.pathname === path;
+  };
+
+  // Format wallet address for display
+  const formatAddress = (address?: string) => {
+    if (!address) return '';
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
   return (
@@ -51,9 +61,12 @@ const Navbar = () => {
                 {link.title}
               </Link>
             ))}
-            <Button className="ml-4 bg-corepulse-orange hover:bg-corepulse-orange-hover transition-colors flex items-center gap-2">
+            <Button 
+              className="ml-4 bg-corepulse-orange hover:bg-corepulse-orange-hover transition-colors flex items-center gap-2"
+              onClick={() => connect()}
+            >
               <Wallet className="w-4 h-4" />
-              <span>Connect Wallet</span>
+              <span>{isConnected ? formatAddress(address) : "Connect Wallet"}</span>
             </Button>
           </nav>
 
@@ -92,10 +105,13 @@ const Navbar = () => {
             <div className="pt-2">
               <Button 
                 className="w-full bg-corepulse-orange hover:bg-corepulse-orange-hover transition-colors flex items-center justify-center gap-2"
-                onClick={() => setIsMenuOpen(false)}
+                onClick={() => {
+                  connect();
+                  setIsMenuOpen(false);
+                }}
               >
                 <Wallet className="w-4 h-4" />
-                <span>Connect Wallet</span>
+                <span>{isConnected ? formatAddress(address) : "Connect Wallet"}</span>
               </Button>
             </div>
           </div>
