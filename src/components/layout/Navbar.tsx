@@ -20,7 +20,7 @@ const Navbar = () => {
     { title: "Dashboard", href: "/dashboard" },
     { title: "Mint NFT", href: "/mint" },
     { title: "Leaderboard", href: "/leaderboard" },
-    { title: "Crew", href: "/crew" },
+    { title: "Crew", href: "/crews" },
     { title: "Lore & Challenges", href: "/lore" }
   ];
 

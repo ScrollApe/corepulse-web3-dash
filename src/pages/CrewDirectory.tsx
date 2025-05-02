@@ -64,21 +64,21 @@ const CrewDirectory = () => {
               .eq('crew_id', crew.id);
               
             // Get sum of total_mined from users who are crew members
-            // Fix: Properly type the RPC function call with parameters
+            // Fix: Ensure proper typing of the RPC function call
             const { data: minerData, error: minerError } = await supabase
-              .rpc('get_crew_total_mined', { crew_id: crew.id });
+              .rpc('get_crew_total_mined', { crew_id: crew.id }) as { data: number | null, error: any };
             
             if (minerError) {
               console.error('Error getting crew total mined:', minerError);
             }
             
-            const totalMined = minerData ? parseFloat(String(minerData)) : 0;
+            const totalMined = minerData || 0;
               
             return { 
               ...crew, 
               _count: { 
                 members: membersCount || 0,
-                total_mined: totalMined || 0 
+                total_mined: totalMined 
               } 
             };
           })
