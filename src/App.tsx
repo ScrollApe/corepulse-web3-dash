@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { WalletProvider } from "./providers/WalletProvider";
+import { ActivityProvider } from "./providers/ActivityProvider";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Mint from "./pages/Mint";
@@ -18,22 +19,24 @@ const queryClient = new QueryClient();
 const App = () => (
   <WalletProvider>
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/mint" element={<Mint />} />
-            <Route path="/leaderboard" element={<Leaderboard />} />
-            <Route path="/lore" element={<Lore />} />
-            <Route path="/crews" element={<CrewDirectory />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
+      <ActivityProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/mint" element={<Mint />} />
+              <Route path="/leaderboard" element={<Leaderboard />} />
+              <Route path="/lore" element={<Lore />} />
+              <Route path="/crews" element={<CrewDirectory />} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </ActivityProvider>
     </QueryClientProvider>
   </WalletProvider>
 );

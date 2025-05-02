@@ -4,8 +4,13 @@ import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import PulseWave from '@/components/ui/PulseWave';
 import { Link } from 'react-router-dom';
+import { useWalletConnect } from '@/providers/WalletProvider';
+import { useAccount } from 'wagmi';
 
 const Index = () => {
+  const { connect } = useWalletConnect();
+  const { isConnected } = useAccount();
+
   return (
     <Layout>
       {/* Hero Section */}
@@ -20,9 +25,20 @@ const Index = () => {
                 Connect your wallet and start mining $CORE tokens. Boost your earnings with NFTs and build your Web3 mining empire.
               </p>
               <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
-                <Button className="bg-corepulse-orange hover:bg-corepulse-orange-hover px-8 py-6 text-lg relative button-pulse">
-                  Connect Wallet & Start Mining
-                </Button>
+                {isConnected ? (
+                  <Button asChild className="bg-corepulse-orange hover:bg-corepulse-orange-hover px-8 py-6 text-lg relative button-pulse">
+                    <Link to="/dashboard">
+                      Go to Dashboard
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button 
+                    className="bg-corepulse-orange hover:bg-corepulse-orange-hover px-8 py-6 text-lg relative button-pulse"
+                    onClick={connect}
+                  >
+                    Connect Wallet & Start Mining
+                  </Button>
+                )}
                 <Button variant="outline" className="border-corepulse-gray-300 px-8 py-6 text-lg">
                   Learn More
                 </Button>
@@ -195,11 +211,20 @@ const Index = () => {
             Join thousands of miners already earning $CORE tokens. Connect your wallet and start mining today.
           </p>
           <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
-            <Button asChild className="bg-white text-corepulse-orange hover:bg-corepulse-gray-100 px-8 py-6 text-lg">
-              <Link to="/dashboard">
-                Go to Dashboard
-              </Link>
-            </Button>
+            {isConnected ? (
+              <Button asChild className="bg-white text-corepulse-orange hover:bg-corepulse-gray-100 px-8 py-6 text-lg">
+                <Link to="/dashboard">
+                  Go to Dashboard
+                </Link>
+              </Button>
+            ) : (
+              <Button 
+                className="bg-white text-corepulse-orange hover:bg-corepulse-gray-100 px-8 py-6 text-lg"
+                onClick={connect}
+              >
+                Connect Wallet
+              </Button>
+            )}
             <Button asChild variant="outline" className="border-white text-white hover:bg-white hover:text-corepulse-orange px-8 py-6 text-lg">
               <Link to="/mint">
                 Explore NFTs

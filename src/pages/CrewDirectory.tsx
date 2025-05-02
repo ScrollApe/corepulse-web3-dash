@@ -4,6 +4,7 @@ import { useAccount } from 'wagmi';
 import { Search, Users, ChevronDown } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 import { useWalletConnect } from '@/providers/WalletProvider';
+import { useActivity } from '@/providers/ActivityProvider';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -40,6 +41,7 @@ const CrewDirectory = () => {
   const [userCrewId, setUserCrewId] = useState<string | null>(null);
   const { isConnected, address } = useAccount();
   const { connect } = useWalletConnect();
+  const { logActivity } = useActivity();
 
   // Fetch all crews and user's crew membership
   useEffect(() => {
@@ -197,6 +199,9 @@ const CrewDirectory = () => {
           });
           
         if (joinError) throw joinError;
+
+        // Log the activity
+        await logActivity('join_crew', { crew_id: crewId, crew_name: crewName });
       } else {
         // User exists, add them to the crew
         const { error: joinError } = await supabase
@@ -207,6 +212,9 @@ const CrewDirectory = () => {
           });
           
         if (joinError) throw joinError;
+        
+        // Log the activity
+        await logActivity('join_crew', { crew_id: crewId, crew_name: crewName });
       }
       
       setUserCrewId(crewId);

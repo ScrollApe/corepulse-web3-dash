@@ -9,6 +9,7 @@ import ReferralCard from '@/components/dashboard/ReferralCard';
 import EpochCard from '@/components/dashboard/EpochCard';
 import LootBox from '@/components/dashboard/LootBox';
 import AvatarCard from '@/components/dashboard/AvatarCard';
+import ActivityFeed from '@/components/dashboard/ActivityFeed';
 
 const Dashboard = () => {
   return (
@@ -47,6 +48,11 @@ const Dashboard = () => {
             />
           </div>
           
+          {/* Activity Feed */}
+          <div className="lg:col-span-2">
+            <ActivityFeed limit={5} />
+          </div>
+          
           {/* Referral Panel */}
           <div>
             <ReferralCard />
@@ -55,6 +61,11 @@ const Dashboard = () => {
           {/* Epoch Countdown */}
           <div>
             <EpochCard daysLeft={5} hoursLeft={12} progress={65} />
+          </div>
+          
+          {/* Community Activity Feed */}
+          <div className="lg:col-span-3">
+            <ActivityFeed global={true} limit={10} />
           </div>
         </div>
       </div>

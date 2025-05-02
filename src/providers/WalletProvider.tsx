@@ -1,12 +1,13 @@
 
 import { useState, useEffect } from 'react';
 import { createWeb3Modal } from '@web3modal/wagmi';
-import { WagmiConfig, createConfig, configureChains } from 'wagmi';
+import { WagmiConfig, createConfig, configureChains, useAccount } from 'wagmi';
 import { mainnet, arbitrum } from 'wagmi/chains';
 import { publicProvider } from 'wagmi/providers/public';
 import { InjectedConnector } from 'wagmi/connectors/injected';
 import { WalletConnectConnector } from 'wagmi/connectors/walletConnect';
 import { toast } from '@/components/ui/sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 // Configure chains & providers
 const { chains, publicClient, webSocketPublicClient } = configureChains(
@@ -41,6 +42,112 @@ const modal = createWeb3Modal({
   }
 });
 
+// Function to track wallet connection in the database
+const trackWalletConnection = async (address: string) => {
+  try {
+    // Check if user exists
+    const { data: existingUser, error: fetchError } = await supabase
+      .from('users')
+      .select()
+      .eq('wallet_address', address.toLowerCase())
+      .maybeSingle();
+      
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      console.error('Error checking for existing user:', fetchError);
+      return;
+    }
+    
+    // If user doesn't exist, create new user
+    if (!existingUser) {
+      const { data, error: insertError } = await supabase
+        .from('users')
+        .insert({
+          wallet_address: address.toLowerCase(),
+        })
+        .select()
+        .single();
+        
+      if (insertError) {
+        console.error('Error creating user:', insertError);
+        return;
+      }
+      
+      // Create initial streak record
+      await supabase
+        .from('streaks')
+        .insert({
+          user_id: data.id,
+        });
+        
+      toast('Welcome to CorePulse!', {
+        description: 'Your account has been created.',
+      });
+      
+    } else {
+      // User exists, log wallet connection
+      const { error: activityError } = await supabase
+        .from('user_activities')
+        .insert({
+          user_id: existingUser.id,
+          activity: 'wallet_connect',
+          metadata: {},
+        });
+        
+      if (activityError) {
+        console.error('Error logging activity:', activityError);
+      }
+      
+      // Update streak if needed
+      const today = new Date().toISOString().split('T')[0];
+      const lastCheckIn = new Date(existingUser.last_check_in || 0).toISOString().split('T')[0];
+      
+      if (today !== lastCheckIn) {
+        // It's a new day, update streak
+        const { data: streakData } = await supabase
+          .from('streaks')
+          .select('current_streak_days, last_check_in')
+          .eq('user_id', existingUser.id)
+          .single();
+          
+        if (streakData) {
+          const lastDate = new Date(streakData.last_check_in);
+          const yesterday = new Date();
+          yesterday.setDate(yesterday.getDate() - 1);
+          
+          // Check if last check-in was yesterday (to maintain streak)
+          const isConsecutiveDay = lastDate.toISOString().split('T')[0] === yesterday.toISOString().split('T')[0];
+          
+          await supabase
+            .from('streaks')
+            .update({
+              current_streak_days: isConsecutiveDay ? streakData.current_streak_days + 1 : 1,
+              last_check_in: new Date().toISOString(),
+            })
+            .eq('user_id', existingUser.id);
+        }
+      }
+      
+      toast('Welcome back!', {
+        description: 'Your wallet has been connected.',
+      });
+    }
+  } catch (error) {
+    console.error('Error tracking wallet connection:', error);
+  }
+};
+
+const WalletConnectionTracker = () => {
+  const { address, isConnected } = useAccount();
+  
+  useEffect(() => {
+    if (isConnected && address) {
+      trackWalletConnection(address);
+    }
+  }, [isConnected, address]);
+  
+  return null;
+};
+
 export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   
@@ -48,7 +155,12 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => setMounted(true), []);
   if (!mounted) return null;
   
-  return <WagmiConfig config={config}>{children}</WagmiConfig>;
+  return (
+    <WagmiConfig config={config}>
+      <WalletConnectionTracker />
+      {children}
+    </WagmiConfig>
+  );
 }
 
 // Utility hook to connect wallet

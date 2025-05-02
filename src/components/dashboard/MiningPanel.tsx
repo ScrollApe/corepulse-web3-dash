@@ -2,13 +2,121 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import PulseWave from '@/components/ui/PulseWave';
+import { useAccount } from 'wagmi';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/components/ui/sonner';
+import { useWalletConnect } from '@/providers/WalletProvider';
+import { useActivity } from '@/providers/ActivityProvider';
 
 const MiningPanel = () => {
   const [isMining, setIsMining] = useState(false);
   const [rate, setRate] = useState(0.0012);
   const [earned, setEarned] = useState(0);
+  const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
+  const [dailyLimits, setDailyLimits] = useState({
+    minutesUsed: 0,
+    maxMinutes: 240, // 4 hours default
+    remaining: 240,
+  });
+  const { isConnected, address } = useAccount();
+  const { connect } = useWalletConnect();
+  const { logActivity } = useActivity();
+  
+  // Fetch daily limits when component mounts or wallet connects
+  useEffect(() => {
+    const fetchDailyLimits = async () => {
+      if (!isConnected || !address) return;
+      
+      try {
+        // Get user id from wallet address
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('id')
+          .eq('wallet_address', address.toLowerCase())
+          .single();
+          
+        if (userError) {
+          console.error('Error fetching user:', userError);
+          return;
+        }
+        
+        const userId = userData.id;
+        const today = new Date().toISOString().split('T')[0];
+        
+        // Check if entry exists for today
+        const { data: limitData, error: limitError } = await supabase
+          .from('daily_mining_limits')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('date', today)
+          .single();
+          
+        if (limitError && limitError.code !== 'PGRST116') { // PGRST116 is "No rows returned" error
+          console.error('Error fetching daily limits:', limitError);
+          return;
+        }
+        
+        if (limitData) {
+          setDailyLimits({
+            minutesUsed: limitData.minutes_mined,
+            maxMinutes: limitData.max_minutes,
+            remaining: limitData.max_minutes - limitData.minutes_mined,
+          });
+        } else {
+          // Create a new entry for today
+          const { error: insertError } = await supabase
+            .from('daily_mining_limits')
+            .insert({
+              user_id: userId,
+              date: today,
+              minutes_mined: 0,
+              max_minutes: 240, // 4 hours default
+            });
+            
+          if (insertError) {
+            console.error('Error creating daily limit:', insertError);
+          }
+        }
+      } catch (error) {
+        console.error('Error in fetchDailyLimits:', error);
+      }
+    };
+    
+    fetchDailyLimits();
+    
+    // Set up realtime subscription
+    if (isConnected && address) {
+      const channel = supabase
+        .channel('daily-limits-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'daily_mining_limits',
+          },
+          (payload) => {
+            if (payload.new) {
+              const newData = payload.new as any;
+              setDailyLimits({
+                minutesUsed: newData.minutes_mined,
+                maxMinutes: newData.max_minutes,
+                remaining: newData.max_minutes - newData.minutes_mined,
+              });
+            }
+          }
+        )
+        .subscribe();
+        
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [isConnected, address]);
 
+  // Handle mining calculation
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
     
@@ -26,9 +134,174 @@ const MiningPanel = () => {
     };
   }, [isMining, rate]);
 
-  const toggleMining = () => {
-    setIsMining(!isMining);
+  // Record mining session
+  const startMiningSession = async () => {
+    if (!isConnected || !address) {
+      connect();
+      return;
+    }
+    
+    try {
+      // Get user id from wallet address
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('wallet_address', address.toLowerCase())
+        .single();
+        
+      if (userError) {
+        console.error('Error fetching user:', userError);
+        toast("Error Starting Mining", {
+          description: "Could not retrieve your user profile.",
+        });
+        return;
+      }
+      
+      // Check daily limits
+      if (dailyLimits.remaining <= 0) {
+        toast("Daily Limit Reached", {
+          description: "You've reached your daily mining limit. Come back tomorrow!",
+        });
+        return;
+      }
+      
+      const userId = userData.id;
+      
+      // Create new mining session
+      const { data: sessionData, error: sessionError } = await supabase
+        .from('mining_sessions')
+        .insert({
+          user_id: userId,
+          base_rate: rate,
+          nft_boost_percent: 0, // Assuming this will be calculated separately
+          referral_bonus_percent: 0, // Assuming this will be calculated separately
+        })
+        .select()
+        .single();
+        
+      if (sessionError) {
+        console.error('Error creating mining session:', sessionError);
+        toast("Error Starting Mining", {
+          description: "Failed to start mining session.",
+        });
+        return;
+      }
+      
+      setSessionStartTime(new Date());
+      setIsMining(true);
+      
+      // Log activity
+      await logActivity('start_mining', { session_id: sessionData.id });
+      
+    } catch (error) {
+      console.error('Error in startMiningSession:', error);
+      toast("Error", {
+        description: "Something went wrong. Please try again.",
+      });
+    }
   };
+
+  const stopMiningSession = async () => {
+    if (!isConnected || !address || !sessionStartTime) return;
+    
+    try {
+      // Get user id from wallet address
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('wallet_address', address.toLowerCase())
+        .single();
+        
+      if (userError) {
+        console.error('Error fetching user:', userError);
+        return;
+      }
+      
+      const userId = userData.id;
+      
+      // Get latest mining session
+      const { data: sessionData, error: sessionError } = await supabase
+        .from('mining_sessions')
+        .select('*')
+        .eq('user_id', userId)
+        .is('end_time', null)
+        .order('start_time', { ascending: false })
+        .limit(1)
+        .single();
+        
+      if (sessionError) {
+        console.error('Error fetching mining session:', sessionError);
+        return;
+      }
+      
+      const now = new Date();
+      const durationMs = now.getTime() - sessionStartTime.getTime();
+      const durationMinutes = Math.max(1, Math.round(durationMs / 60000));
+      
+      // Update mining session
+      await supabase
+        .from('mining_sessions')
+        .update({
+          end_time: now.toISOString(),
+          earned_amount: earned,
+        })
+        .eq('id', sessionData.id);
+        
+      // Update user's total mined amount
+      await supabase
+        .from('users')
+        .update({
+          total_mined: supabase.rpc('increment', { x: earned }),
+        })
+        .eq('id', userId);
+        
+      // Update daily limits
+      const today = now.toISOString().split('T')[0];
+      
+      await supabase
+        .from('daily_mining_limits')
+        .update({
+          minutes_mined: supabase.rpc('increment', { x: durationMinutes }),
+          last_mining_session_id: sessionData.id,
+        })
+        .eq('user_id', userId)
+        .eq('date', today);
+        
+      // Log activity
+      await logActivity('stop_mining', { 
+        session_id: sessionData.id,
+        duration: durationMinutes,
+        earned: earned.toFixed(6)
+      });
+      
+      // Reset state
+      setIsMining(false);
+      setSessionStartTime(null);
+      
+      // Show success toast
+      toast("Mining Stopped", {
+        description: `You earned ${earned.toFixed(6)} WAVES in ${durationMinutes} minutes!`,
+      });
+      
+    } catch (error) {
+      console.error('Error in stopMiningSession:', error);
+      setIsMining(false);
+      toast("Error", {
+        description: "There was an issue stopping your mining session.",
+      });
+    }
+  };
+
+  const toggleMining = () => {
+    if (isMining) {
+      stopMiningSession();
+    } else {
+      startMiningSession();
+    }
+  };
+
+  // Calculate percentage of daily limit used
+  const dailyLimitPercentage = Math.min(100, (dailyLimits.minutesUsed / dailyLimits.maxMinutes) * 100);
 
   return (
     <Card className="relative overflow-hidden border-2">
@@ -50,22 +323,48 @@ const MiningPanel = () => {
             <p className="text-3xl font-bold">{rate.toFixed(4)} $CORE/min</p>
           </div>
           
-          <Button 
-            onClick={toggleMining}
-            className={`w-40 h-40 rounded-full relative button-pulse flex flex-col items-center justify-center ${
-              isMining 
-                ? "bg-red-500 hover:bg-red-600" 
-                : "bg-corepulse-orange hover:bg-corepulse-orange-hover"
-            }`}
-          >
-            <span className="text-lg font-bold mb-1">{isMining ? 'Stop' : 'Start'}</span>
-            <span>Mining</span>
-          </Button>
+          {!isConnected ? (
+            <Button 
+              onClick={connect}
+              className="w-40 h-40 rounded-full relative button-pulse flex flex-col items-center justify-center bg-corepulse-orange hover:bg-corepulse-orange-hover"
+            >
+              <span className="text-lg font-bold mb-1">Connect</span>
+              <span>Wallet</span>
+            </Button>
+          ) : (
+            <Button 
+              onClick={toggleMining}
+              disabled={!isConnected || (dailyLimits.remaining <= 0 && !isMining)}
+              className={`w-40 h-40 rounded-full relative button-pulse flex flex-col items-center justify-center ${
+                isMining 
+                  ? "bg-red-500 hover:bg-red-600" 
+                  : dailyLimits.remaining <= 0
+                    ? "bg-corepulse-gray-400 cursor-not-allowed"
+                    : "bg-corepulse-orange hover:bg-corepulse-orange-hover"
+              }`}
+            >
+              <span className="text-lg font-bold mb-1">{isMining ? 'Stop' : 'Start'}</span>
+              <span>Mining</span>
+            </Button>
+          )}
           
           <div className="text-center">
             <p className="text-sm text-corepulse-gray-600">Earned this session</p>
             <p className="text-3xl font-bold">{earned.toFixed(6)} $CORE</p>
           </div>
+          
+          {isConnected && (
+            <div className="w-full space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Daily Mining Limit</span>
+                <span>{dailyLimits.minutesUsed} / {dailyLimits.maxMinutes} minutes</span>
+              </div>
+              <Progress value={dailyLimitPercentage} className="h-2" />
+              {dailyLimits.remaining <= 0 && !isMining && (
+                <p className="text-center text-red-500 text-sm">Daily limit reached. Come back tomorrow!</p>
+              )}
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

@@ -101,6 +101,48 @@ export type Database = {
           },
         ]
       }
+      daily_mining_limits: {
+        Row: {
+          date: string
+          id: string
+          last_mining_session_id: string | null
+          max_minutes: number | null
+          minutes_mined: number | null
+          user_id: string | null
+        }
+        Insert: {
+          date: string
+          id?: string
+          last_mining_session_id?: string | null
+          max_minutes?: number | null
+          minutes_mined?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          date?: string
+          id?: string
+          last_mining_session_id?: string | null
+          max_minutes?: number | null
+          minutes_mined?: number | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_mining_limits_last_mining_session_id_fkey"
+            columns: ["last_mining_session_id"]
+            isOneToOne: false
+            referencedRelation: "mining_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_mining_limits_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leaderboards: {
         Row: {
           epoch: number
@@ -288,6 +330,41 @@ export type Database = {
           },
         ]
       }
+      user_activities: {
+        Row: {
+          activity: Database["public"]["Enums"]["activity_type"]
+          created_at: string
+          id: string
+          metadata: Json | null
+          user_id: string | null
+          visible: boolean | null
+        }
+        Insert: {
+          activity: Database["public"]["Enums"]["activity_type"]
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          user_id?: string | null
+          visible?: boolean | null
+        }
+        Update: {
+          activity?: Database["public"]["Enums"]["activity_type"]
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          user_id?: string | null
+          visible?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_activities_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_challenges: {
         Row: {
           challenge_id: string | null
@@ -359,6 +436,14 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      activity_type:
+        | "wallet_connect"
+        | "start_mining"
+        | "stop_mining"
+        | "join_crew"
+        | "leave_crew"
+        | "mint_nft"
+        | "claim_reward"
       nft_tier: "bronze" | "silver" | "gold"
     }
     CompositeTypes: {
@@ -475,6 +560,15 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      activity_type: [
+        "wallet_connect",
+        "start_mining",
+        "stop_mining",
+        "join_crew",
+        "leave_crew",
+        "mint_nft",
+        "claim_reward",
+      ],
       nft_tier: ["bronze", "silver", "gold"],
     },
   },
