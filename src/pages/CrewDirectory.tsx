@@ -64,10 +64,15 @@ const CrewDirectory = () => {
               .eq('crew_id', crew.id);
               
             // Get sum of total_mined from users who are crew members
-            const { data: minerData } = await supabase
+            // Fix: Properly type the RPC function call with parameters
+            const { data: minerData, error: minerError } = await supabase
               .rpc('get_crew_total_mined', { crew_id: crew.id });
             
-            const totalMined = minerData ? parseFloat(minerData) : 0;
+            if (minerError) {
+              console.error('Error getting crew total mined:', minerError);
+            }
+            
+            const totalMined = minerData ? parseFloat(String(minerData)) : 0;
               
             return { 
               ...crew, 
