@@ -10,6 +10,10 @@ import EpochCard from '@/components/dashboard/EpochCard';
 import LootBox from '@/components/dashboard/LootBox';
 import AvatarCard from '@/components/dashboard/AvatarCard';
 import ActivityFeed from '@/components/dashboard/ActivityFeed';
+import AchievementsBadges from '@/components/dashboard/AchievementsBadges';
+import WeeklyChallenges from '@/components/dashboard/WeeklyChallenges';
+import { Link } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 
 const Dashboard = () => {
   return (
@@ -25,12 +29,12 @@ const Dashboard = () => {
           
           {/* NFT Boost panel */}
           <div>
-            <NFTBoostCard activeBoost={15} nftCount={2} />
+            <NFTBoostCard />
           </div>
           
           {/* Daily Streak */}
           <div>
-            <StreakCard currentStreak={5} bestStreak={12} />
+            <StreakCard />
           </div>
           
           {/* Earnings Summary - takes more space */}
@@ -40,12 +44,7 @@ const Dashboard = () => {
           
           {/* Avatar Evolution */}
           <div className="lg:row-span-2">
-            <AvatarCard 
-              level={7} 
-              experience={350} 
-              nextLevelExp={500} 
-              avatarImage="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" 
-            />
+            <AvatarCard />
           </div>
           
           {/* Activity Feed */}
@@ -60,7 +59,27 @@ const Dashboard = () => {
           
           {/* Epoch Countdown */}
           <div>
-            <EpochCard daysLeft={5} hoursLeft={12} progress={65} />
+            <EpochCard />
+          </div>
+          
+          {/* Weekly Challenges */}
+          <div className="lg:col-span-2">
+            <WeeklyChallenges />
+            <div className="mt-4 flex justify-end">
+              <Button asChild variant="outline">
+                <Link to="/weekly-challenges">View All Challenges</Link>
+              </Button>
+            </div>
+          </div>
+          
+          {/* Achievements */}
+          <div>
+            <AchievementsBadges />
+            <div className="mt-4 flex justify-end">
+              <Button asChild variant="outline" size="sm">
+                <Link to="/achievements">View All Achievements</Link>
+              </Button>
+            </div>
           </div>
           
           {/* Community Activity Feed */}

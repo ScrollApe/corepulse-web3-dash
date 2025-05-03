@@ -252,6 +252,7 @@ const MiningPanel = () => {
         .from('users')
         .update({
           total_mined: supabase.rpc('increment', { x: earned }),
+          experience: supabase.rpc('increment', { x: Math.floor(earned * 10) }) // Add XP based on earnings
         })
         .eq('id', userId);
         
@@ -273,6 +274,94 @@ const MiningPanel = () => {
         duration: durationMinutes,
         earned: earned.toFixed(6)
       });
+      
+      // Check for weekly challenges progress
+      const { data: challenges, error: challengesError } = await supabase
+        .from('weekly_challenges')
+        .select('id, goal')
+        .eq('challenge_type', 'mining')
+        .gte('end_date', now.toISOString());
+        
+      if (!challengesError && challenges && challenges.length > 0) {
+        // For each mining-related challenge, update progress
+        for (const challenge of challenges) {
+          // Check if user has this challenge
+          const { data: userChallenge, error: userChallengeError } = await supabase
+            .from('user_weekly_challenges')
+            .select('id, progress, completed')
+            .eq('user_id', userId)
+            .eq('challenge_id', challenge.id)
+            .single();
+            
+          if (userChallengeError && userChallengeError.code === 'PGRST116') {
+            // No record yet, create one
+            await supabase
+              .from('user_weekly_challenges')
+              .insert({
+                user_id: userId,
+                challenge_id: challenge.id,
+                progress: durationMinutes,
+                completed: durationMinutes >= challenge.goal
+              });
+          } else if (!userChallengeError && userChallenge && !userChallenge.completed) {
+            // Update existing challenge progress
+            const newProgress = userChallenge.progress + durationMinutes;
+            const completed = newProgress >= challenge.goal;
+            
+            await supabase
+              .from('user_weekly_challenges')
+              .update({
+                progress: newProgress,
+                completed,
+                completed_at: completed ? now.toISOString() : null
+              })
+              .eq('id', userChallenge.id);
+          }
+        }
+      }
+      
+      // Check for Mining Novice achievement
+      try {
+        // Get user's total mined amount
+        const { data: userMined, error: userMinedError } = await supabase
+          .from('users')
+          .select('total_mined')
+          .eq('id', userId)
+          .single();
+          
+        if (!userMinedError && userMined && userMined.total_mined >= 100) {
+          // Check if they already have the achievement
+          const { data: achievementData, error: achievementError } = await supabase
+            .from('achievements')
+            .select('id')
+            .eq('name', 'Mining Novice')
+            .single();
+            
+          if (!achievementError && achievementData) {
+            // Check if user already has this achievement
+            const { data: userAchievement, error: userAchievementError } = await supabase
+              .from('user_achievements')
+              .select('id')
+              .eq('user_id', userId)
+              .eq('achievement_id', achievementData.id)
+              .single();
+              
+            if (userAchievementError && userAchievementError.code === 'PGRST116') {
+              // User doesn't have achievement yet, add it
+              await supabase
+                .from('user_achievements')
+                .insert({
+                  user_id: userId,
+                  achievement_id: achievementData.id
+                });
+                
+              toast.success("Achievement Unlocked: Mining Novice!");
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error checking for achievements:', error);
+      }
       
       // Reset state
       setIsMining(false);

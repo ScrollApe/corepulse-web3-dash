@@ -48,7 +48,7 @@ const trackWalletConnection = async (address: string) => {
     // Check if user exists
     const { data: existingUser, error: fetchError } = await supabase
       .from('users')
-      .select()
+      .select('id, last_check_in')
       .eq('wallet_address', address.toLowerCase())
       .maybeSingle();
       
@@ -63,6 +63,10 @@ const trackWalletConnection = async (address: string) => {
         .from('users')
         .insert({
           wallet_address: address.toLowerCase(),
+          level: 1,
+          experience: 0,
+          next_level_exp: 100,
+          total_mined: 0
         })
         .select()
         .single();
@@ -77,8 +81,45 @@ const trackWalletConnection = async (address: string) => {
         .from('streaks')
         .insert({
           user_id: data.id,
+          current_streak_days: 1,
+          best_streak_days: 1,
+          last_check_in: new Date().toISOString()
         });
         
+      // Create initial activity
+      await supabase
+        .from('user_activities')
+        .insert({
+          user_id: data.id,
+          activity: 'wallet_connect',
+          metadata: {}
+        });
+        
+      // Try to unlock the Early Adopter achievement
+      try {
+        // Get current epoch
+        const { data: epochId } = await supabase.rpc('get_current_epoch_id');
+        
+        if (epochId === 1) { // First epoch
+          const { data: achievementData, error: achievementError } = await supabase
+            .from('achievements')
+            .select('id')
+            .eq('name', 'Early Adopter')
+            .single();
+            
+          if (!achievementError && achievementData) {
+            await supabase
+              .from('user_achievements')
+              .insert({
+                user_id: data.id,
+                achievement_id: achievementData.id
+              });
+          }
+        }
+      } catch (error) {
+        console.error('Error unlocking achievement:', error);
+      }
+      
       toast('Welcome to CorePulse!', {
         description: 'Your account has been created.',
       });
@@ -99,31 +140,51 @@ const trackWalletConnection = async (address: string) => {
       
       // Update streak if needed
       const today = new Date().toISOString().split('T')[0];
-      const lastCheckIn = new Date(existingUser.last_check_in || 0).toISOString().split('T')[0];
+      const lastCheckIn = existingUser.last_check_in ? 
+        new Date(existingUser.last_check_in).toISOString().split('T')[0] : null;
       
-      if (today !== lastCheckIn) {
+      if (!lastCheckIn || today !== lastCheckIn) {
         // It's a new day, update streak
-        const { data: streakData } = await supabase
+        const { data: streakData, error: streakError } = await supabase
           .from('streaks')
-          .select('current_streak_days, last_check_in')
+          .select('current_streak_days, best_streak_days, last_check_in')
           .eq('user_id', existingUser.id)
           .single();
           
+        if (streakError) {
+          console.error('Error fetching streak data:', streakError);
+        }
+        
         if (streakData) {
-          const lastDate = new Date(streakData.last_check_in);
+          const lastDate = new Date(streakData.last_check_in || 0);
           const yesterday = new Date();
           yesterday.setDate(yesterday.getDate() - 1);
           
           // Check if last check-in was yesterday (to maintain streak)
-          const isConsecutiveDay = lastDate.toISOString().split('T')[0] === yesterday.toISOString().split('T')[0];
+          const isConsecutiveDay = lastCheckIn && 
+            new Date(lastCheckIn).toISOString().split('T')[0] === 
+            yesterday.toISOString().split('T')[0];
           
+          const newStreakDays = isConsecutiveDay ? streakData.current_streak_days + 1 : 1;
+          const newBestStreak = Math.max(streakData.best_streak_days || 0, newStreakDays);
+          
+          // Update user's streak
           await supabase
             .from('streaks')
             .update({
-              current_streak_days: isConsecutiveDay ? streakData.current_streak_days + 1 : 1,
-              last_check_in: new Date().toISOString(),
+              current_streak_days: newStreakDays,
+              best_streak_days: newBestStreak,
+              last_check_in: new Date().toISOString()
             })
             .eq('user_id', existingUser.id);
+          
+          // Update user's last check-in
+          await supabase
+            .from('users')
+            .update({
+              last_check_in: new Date().toISOString()
+            })
+            .eq('id', existingUser.id);
         }
       }
       

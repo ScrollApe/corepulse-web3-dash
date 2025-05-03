@@ -9,6 +9,30 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      achievements: {
+        Row: {
+          created_at: string | null
+          description: string
+          id: string
+          image_url: string | null
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          description: string
+          id?: string
+          image_url?: string | null
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string
+          id?: string
+          image_url?: string | null
+          name?: string
+        }
+        Relationships: []
+      }
       challenges: {
         Row: {
           duration_days: number
@@ -142,6 +166,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      epochs: {
+        Row: {
+          end_date: string
+          id: number
+          start_date: string
+          status: string | null
+        }
+        Insert: {
+          end_date: string
+          id?: number
+          start_date?: string
+          status?: string | null
+        }
+        Update: {
+          end_date?: string
+          id?: number
+          start_date?: string
+          status?: string | null
+        }
+        Relationships: []
       }
       leaderboards: {
         Row: {
@@ -330,6 +375,42 @@ export type Database = {
           },
         ]
       }
+      user_achievements: {
+        Row: {
+          achievement_id: string | null
+          id: string
+          unlocked_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          achievement_id?: string | null
+          id?: string
+          unlocked_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          achievement_id?: string | null
+          id?: string
+          unlocked_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_achievements_achievement_id_fkey"
+            columns: ["achievement_id"]
+            isOneToOne: false
+            referencedRelation: "achievements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_achievements_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_activities: {
         Row: {
           activity: Database["public"]["Enums"]["activity_type"]
@@ -404,27 +485,111 @@ export type Database = {
           },
         ]
       }
+      user_weekly_challenges: {
+        Row: {
+          challenge_id: string | null
+          completed: boolean | null
+          completed_at: string | null
+          id: string
+          progress: number | null
+          user_id: string | null
+        }
+        Insert: {
+          challenge_id?: string | null
+          completed?: boolean | null
+          completed_at?: string | null
+          id?: string
+          progress?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          challenge_id?: string | null
+          completed?: boolean | null
+          completed_at?: string | null
+          id?: string
+          progress?: number | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_weekly_challenges_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "weekly_challenges"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_weekly_challenges_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           avatar_stage: number | null
+          experience: number | null
           id: string
           joined_at: string | null
+          level: number | null
+          next_level_exp: number | null
           total_mined: number | null
           wallet_address: string
         }
         Insert: {
           avatar_stage?: number | null
+          experience?: number | null
           id?: string
           joined_at?: string | null
+          level?: number | null
+          next_level_exp?: number | null
           total_mined?: number | null
           wallet_address: string
         }
         Update: {
           avatar_stage?: number | null
+          experience?: number | null
           id?: string
           joined_at?: string | null
+          level?: number | null
+          next_level_exp?: number | null
           total_mined?: number | null
           wallet_address?: string
+        }
+        Relationships: []
+      }
+      weekly_challenges: {
+        Row: {
+          challenge_type: string
+          description: string
+          end_date: string
+          goal: number
+          id: string
+          reward: number
+          start_date: string | null
+          title: string
+        }
+        Insert: {
+          challenge_type: string
+          description: string
+          end_date: string
+          goal: number
+          id?: string
+          reward: number
+          start_date?: string | null
+          title: string
+        }
+        Update: {
+          challenge_type?: string
+          description?: string
+          end_date?: string
+          goal?: number
+          id?: string
+          reward?: number
+          start_date?: string | null
+          title?: string
         }
         Relationships: []
       }
@@ -433,7 +598,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_crew_total_mined: {
+        Args: { crew_id: string }
+        Returns: number
+      }
+      get_current_epoch_id: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
     }
     Enums: {
       activity_type:
