@@ -13,10 +13,13 @@ const Index = () => {
   const { connect } = useWalletConnect();
   const { isConnected } = useAccount();
   const navigate = useNavigate();
-  const params = useParams();
+  const { referralCode: urlReferralCode } = useParams();
   const { applyReferralCode } = useReferralSystem();
-  const referralCode = window.location.pathname.startsWith('/ref/') ? 
-    window.location.pathname.split('/ref/')[1] : null;
+  
+  // Extract referral code from URL path
+  const referralCode = urlReferralCode || 
+    (window.location.pathname.startsWith('/ref/') ? 
+    window.location.pathname.split('/ref/')[1] : null);
   
   useEffect(() => {
     const handleReferral = async () => {

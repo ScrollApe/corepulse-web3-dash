@@ -48,7 +48,7 @@ const trackWalletConnection = async (address: string) => {
     // Check if user exists
     const { data: existingUser, error: fetchError } = await supabase
       .from('users')
-      .select('id, last_check_in')
+      .select('id')
       .eq('wallet_address', address.toLowerCase())
       .maybeSingle();
       
@@ -136,56 +136,6 @@ const trackWalletConnection = async (address: string) => {
         
       if (activityError) {
         console.error('Error logging activity:', activityError);
-      }
-      
-      // Update streak if needed
-      const today = new Date().toISOString().split('T')[0];
-      const lastCheckIn = existingUser.last_check_in ? 
-        new Date(existingUser.last_check_in).toISOString().split('T')[0] : null;
-      
-      if (!lastCheckIn || today !== lastCheckIn) {
-        // It's a new day, update streak
-        const { data: streakData, error: streakError } = await supabase
-          .from('streaks')
-          .select('current_streak_days, best_streak_days, last_check_in')
-          .eq('user_id', existingUser.id)
-          .single();
-          
-        if (streakError) {
-          console.error('Error fetching streak data:', streakError);
-        }
-        
-        if (streakData) {
-          const lastDate = new Date(streakData.last_check_in || 0);
-          const yesterday = new Date();
-          yesterday.setDate(yesterday.getDate() - 1);
-          
-          // Check if last check-in was yesterday (to maintain streak)
-          const isConsecutiveDay = lastCheckIn && 
-            new Date(lastCheckIn).toISOString().split('T')[0] === 
-            yesterday.toISOString().split('T')[0];
-          
-          const newStreakDays = isConsecutiveDay ? streakData.current_streak_days + 1 : 1;
-          const newBestStreak = Math.max(streakData.best_streak_days || 0, newStreakDays);
-          
-          // Update user's streak
-          await supabase
-            .from('streaks')
-            .update({
-              current_streak_days: newStreakDays,
-              best_streak_days: newBestStreak,
-              last_check_in: new Date().toISOString()
-            })
-            .eq('user_id', existingUser.id);
-          
-          // Update user's last check-in
-          await supabase
-            .from('users')
-            .update({
-              last_check_in: new Date().toISOString()
-            })
-            .eq('id', existingUser.id);
-        }
       }
       
       toast('Welcome back!', {

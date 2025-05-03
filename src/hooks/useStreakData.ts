@@ -46,7 +46,7 @@ export const useStreakData = () => {
         // Get streak data
         const { data: streakData, error: streakError } = await supabase
           .from('streaks')
-          .select('*')
+          .select('current_streak_days, best_streak_days, last_check_in')
           .eq('user_id', userData.id)
           .single();
           
@@ -94,7 +94,7 @@ export const useStreakData = () => {
         setStreakData({
           currentStreak: streakData?.current_streak_days || 0,
           bestStreak: streakData?.best_streak_days || 0,
-          lastCheckIn: streakData?.last_check_in,
+          lastCheckIn: streakData?.last_check_in || null,
           activityPattern
         });
         
