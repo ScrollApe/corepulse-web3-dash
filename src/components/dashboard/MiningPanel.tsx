@@ -30,6 +30,8 @@ const MiningPanel = () => {
       if (!isConnected || !address) return;
       
       try {
+        setLoading(true);
+        
         // Get user id from wallet address
         const { data: userData, error: userError } = await supabase
           .from('users')
@@ -81,6 +83,8 @@ const MiningPanel = () => {
         }
       } catch (error) {
         console.error('Error in fetchDailyLimits:', error);
+      } finally {
+        setLoading(false);
       }
     };
     
@@ -248,32 +252,54 @@ const MiningPanel = () => {
         .eq('id', sessionData.id);
         
       // Update user's total mined amount
-      const { error: updateUserError } = await supabase
+      // Using a normal update with direct value addition instead of RPC calls
+      const { data: userData2, error: userDataError } = await supabase
         .from('users')
-        .update({
-          total_mined: supabase.rpc('increment', { x: earned }),
-          experience: supabase.rpc('increment', { x: Math.floor(earned * 10) }) // Add XP based on earnings
-        })
-        .eq('id', userId);
+        .select('total_mined, experience')
+        .eq('id', userId)
+        .single();
 
-      if (updateUserError) {
-        console.error('Error updating user totals:', updateUserError);
+      if (userDataError) {
+        console.error('Error fetching user data:', userDataError);
+      } else {
+        const { error: updateUserError } = await supabase
+          .from('users')
+          .update({
+            total_mined: userData2.total_mined + earned,
+            experience: userData2.experience + Math.floor(earned * 10)
+          })
+          .eq('id', userId);
+
+        if (updateUserError) {
+          console.error('Error updating user totals:', updateUserError);
+        }
       }
-        
+
       // Update daily limits
       const today = now.toISOString().split('T')[0];
       
-      const { error: updateLimitsError } = await supabase
+      const { data: dailyLimitData, error: dailyLimitDataError } = await supabase
         .from('daily_mining_limits')
-        .update({
-          minutes_mined: supabase.rpc('increment', { x: durationMinutes }),
-          last_mining_session_id: sessionData.id,
-        })
+        .select('minutes_mined')
         .eq('user_id', userId)
-        .eq('date', today);
+        .eq('date', today)
+        .single();
 
-      if (updateLimitsError) {
-        console.error('Error updating daily limits:', updateLimitsError);
+      if (dailyLimitDataError) {
+        console.error('Error fetching daily limit data:', dailyLimitDataError);
+      } else {
+        const { error: updateLimitsError } = await supabase
+          .from('daily_mining_limits')
+          .update({
+            minutes_mined: dailyLimitData.minutes_mined + durationMinutes,
+            last_mining_session_id: sessionData.id,
+          })
+          .eq('user_id', userId)
+          .eq('date', today);
+
+        if (updateLimitsError) {
+          console.error('Error updating daily limits:', updateLimitsError);
+        }
       }
         
       // Log activity

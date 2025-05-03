@@ -46,7 +46,7 @@ export const useStreakData = () => {
         // Get streak data
         const { data: streakData, error: streakError } = await supabase
           .from('streaks')
-          .select('current_streak_days, best_streak_days, last_check_in')
+          .select('current_streak_days, last_check_in')
           .eq('user_id', userData.id)
           .single();
           
@@ -91,9 +91,11 @@ export const useStreakData = () => {
           }
         }
         
+        // The best_streak_days field doesn't exist in the schema, so we use current_streak_days as the best streak
+        // This should be updated if a proper best_streak_days field is added to the schema
         setStreakData({
           currentStreak: streakData ? streakData.current_streak_days || 0 : 0,
-          bestStreak: streakData ? streakData.best_streak_days || 0 : 0,
+          bestStreak: streakData ? streakData.current_streak_days || 0 : 0,  // Using current as best for now
           lastCheckIn: streakData ? streakData.last_check_in : null,
           activityPattern
         });

@@ -606,6 +606,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      increment: {
+        Args: { x: number }
+        Returns: number
+      }
     }
     Enums: {
       activity_type:
