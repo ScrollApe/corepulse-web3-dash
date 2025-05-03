@@ -92,9 +92,9 @@ export const useStreakData = () => {
         }
         
         setStreakData({
-          currentStreak: streakData?.current_streak_days || 0,
-          bestStreak: streakData?.best_streak_days || 0,
-          lastCheckIn: streakData?.last_check_in || null,
+          currentStreak: streakData ? streakData.current_streak_days || 0 : 0,
+          bestStreak: streakData ? streakData.best_streak_days || 0 : 0,
+          lastCheckIn: streakData ? streakData.last_check_in : null,
           activityPattern
         });
         

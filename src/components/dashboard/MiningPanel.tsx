@@ -248,18 +248,22 @@ const MiningPanel = () => {
         .eq('id', sessionData.id);
         
       // Update user's total mined amount
-      await supabase
+      const { error: updateUserError } = await supabase
         .from('users')
         .update({
           total_mined: supabase.rpc('increment', { x: earned }),
           experience: supabase.rpc('increment', { x: Math.floor(earned * 10) }) // Add XP based on earnings
         })
         .eq('id', userId);
+
+      if (updateUserError) {
+        console.error('Error updating user totals:', updateUserError);
+      }
         
       // Update daily limits
       const today = now.toISOString().split('T')[0];
       
-      await supabase
+      const { error: updateLimitsError } = await supabase
         .from('daily_mining_limits')
         .update({
           minutes_mined: supabase.rpc('increment', { x: durationMinutes }),
@@ -267,6 +271,10 @@ const MiningPanel = () => {
         })
         .eq('user_id', userId)
         .eq('date', today);
+
+      if (updateLimitsError) {
+        console.error('Error updating daily limits:', updateLimitsError);
+      }
         
       // Log activity
       await logActivity('stop_mining', { 

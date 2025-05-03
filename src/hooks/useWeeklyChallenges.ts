@@ -85,11 +85,18 @@ export const useWeeklyChallenges = () => {
           setChallenges(transformedChallenges);
         } else {
           // Transform the data to flatten the nested structure
-          const transformedChallenges = data.map(item => ({
-            ...item,
-            progress: item.user_progress?.progress || 0,
-            completed: item.user_progress?.completed || false
-          }));
+          const transformedChallenges = data.map(item => {
+            // Handle the case where user_progress might be an array
+            const userProgress = Array.isArray(item.user_progress) 
+              ? item.user_progress[0] 
+              : item.user_progress;
+              
+            return {
+              ...item,
+              progress: userProgress?.progress || 0,
+              completed: userProgress?.completed || false
+            };
+          });
           
           setChallenges(transformedChallenges);
         }
