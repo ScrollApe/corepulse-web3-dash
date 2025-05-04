@@ -59,6 +59,7 @@ const trackWalletConnection = async (address: string) => {
     
     // If user doesn't exist, create new user
     if (!existingUser) {
+      // Create user with explicit fields to avoid RLS policy issues
       const { data, error: insertError } = await supabase
         .from('users')
         .insert({
@@ -66,28 +67,37 @@ const trackWalletConnection = async (address: string) => {
           level: 1,
           experience: 0,
           next_level_exp: 100,
-          total_mined: 0
+          total_mined: 0,
+          avatar_stage: 1
         })
         .select()
         .single();
         
       if (insertError) {
         console.error('Error creating user:', insertError);
+        toast("Error Creating Profile", {
+          description: "Could not create your user profile. Please try again.",
+        });
         return;
       }
       
+      console.log("Created new user:", data);
+      
       // Create initial streak record
-      await supabase
+      const { error: streakError } = await supabase
         .from('streaks')
         .insert({
           user_id: data.id,
           current_streak_days: 1,
-          best_streak_days: 1,
           last_check_in: new Date().toISOString()
         });
         
+      if (streakError) {
+        console.error('Error creating streak record:', streakError);
+      }
+        
       // Create initial activity
-      await supabase
+      const { error: activityError } = await supabase
         .from('user_activities')
         .insert({
           user_id: data.id,
@@ -95,6 +105,10 @@ const trackWalletConnection = async (address: string) => {
           metadata: {}
         });
         
+      if (activityError) {
+        console.error('Error creating activity record:', activityError);
+      }
+      
       // Try to unlock the Early Adopter achievement
       try {
         // Get current epoch
@@ -125,6 +139,8 @@ const trackWalletConnection = async (address: string) => {
       });
       
     } else {
+      console.log("Found existing user:", existingUser);
+      
       // User exists, log wallet connection
       const { error: activityError } = await supabase
         .from('user_activities')
@@ -144,6 +160,9 @@ const trackWalletConnection = async (address: string) => {
     }
   } catch (error) {
     console.error('Error tracking wallet connection:', error);
+    toast("Connection Error", {
+      description: "There was an issue with your wallet connection.",
+    });
   }
 };
 

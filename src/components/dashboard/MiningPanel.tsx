@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +11,7 @@ import { useActivity } from '@/providers/ActivityProvider';
 
 const MiningPanel = () => {
   const [isMining, setIsMining] = useState(false);
+  const [loading, setLoading] = useState(false); // Added missing loading state
   const [rate, setRate] = useState(0.0012);
   const [earned, setEarned] = useState(0);
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
@@ -156,7 +156,7 @@ const MiningPanel = () => {
       if (userError) {
         console.error('Error fetching user:', userError);
         toast("Error Starting Mining", {
-          description: "Could not retrieve your user profile.",
+          description: "Could not retrieve your user profile. Please try reconnecting your wallet.",
         });
         return;
       }
