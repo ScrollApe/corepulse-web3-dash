@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +12,7 @@ import { useActivity } from '@/providers/ActivityProvider';
 
 const MiningPanel = () => {
   const [isMining, setIsMining] = useState(false);
-  const [loading, setLoading] = useState(false); // Added missing loading state
+  const [loading, setLoading] = useState(false);
   const [rate, setRate] = useState(0.0012);
   const [earned, setEarned] = useState(0);
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
@@ -20,31 +21,55 @@ const MiningPanel = () => {
     maxMinutes: 240, // 4 hours default
     remaining: 240,
   });
+  const [userId, setUserId] = useState<string | null>(null);
   const { isConnected, address } = useAccount();
   const { connect } = useWalletConnect();
   const { logActivity } = useActivity();
   
-  // Fetch daily limits when component mounts or wallet connects
+  // Fetch user ID when wallet is connected
+  useEffect(() => {
+    const fetchUserId = async () => {
+      if (!isConnected || !address) return;
+      
+      try {
+        console.log("Fetching user ID for address:", address.toLowerCase());
+        
+        const { data, error } = await supabase
+          .from('users')
+          .select('id')
+          .eq('wallet_address', address.toLowerCase())
+          .maybeSingle();
+          
+        if (error) {
+          console.error('Error fetching user ID:', error);
+          return;
+        }
+        
+        if (data) {
+          console.log("Found user ID:", data.id);
+          setUserId(data.id);
+        } else {
+          console.error("No user found for wallet address:", address.toLowerCase());
+          toast("User Profile Not Found", {
+            description: "Your wallet is connected but no user profile was found. Try disconnecting and reconnecting your wallet.",
+          });
+        }
+      } catch (err) {
+        console.error('Error in fetchUserId:', err);
+      }
+    };
+    
+    fetchUserId();
+  }, [isConnected, address]);
+  
+  // Fetch daily limits when user ID is available
   useEffect(() => {
     const fetchDailyLimits = async () => {
-      if (!isConnected || !address) return;
+      if (!userId) return;
       
       try {
         setLoading(true);
         
-        // Get user id from wallet address
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('id')
-          .eq('wallet_address', address.toLowerCase())
-          .single();
-          
-        if (userError) {
-          console.error('Error fetching user:', userError);
-          return;
-        }
-        
-        const userId = userData.id;
         const today = new Date().toISOString().split('T')[0];
         
         // Check if entry exists for today
@@ -91,7 +116,7 @@ const MiningPanel = () => {
     fetchDailyLimits();
     
     // Set up realtime subscription
-    if (isConnected && address) {
+    if (userId) {
       const channel = supabase
         .channel('daily-limits-changes')
         .on(
@@ -118,7 +143,7 @@ const MiningPanel = () => {
         supabase.removeChannel(channel);
       };
     }
-  }, [isConnected, address]);
+  }, [userId]);
 
   // Handle mining calculation
   useEffect(() => {
@@ -145,22 +170,15 @@ const MiningPanel = () => {
       return;
     }
     
+    if (!userId) {
+      console.error("Cannot start mining: User ID not found");
+      toast("User Profile Not Found", {
+        description: "Your wallet is connected but no user profile was found. Try disconnecting and reconnecting your wallet.",
+      });
+      return;
+    }
+    
     try {
-      // Get user id from wallet address
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('wallet_address', address.toLowerCase())
-        .single();
-        
-      if (userError) {
-        console.error('Error fetching user:', userError);
-        toast("Error Starting Mining", {
-          description: "Could not retrieve your user profile. Please try reconnecting your wallet.",
-        });
-        return;
-      }
-      
       // Check daily limits
       if (dailyLimits.remaining <= 0) {
         toast("Daily Limit Reached", {
@@ -168,8 +186,6 @@ const MiningPanel = () => {
         });
         return;
       }
-      
-      const userId = userData.id;
       
       // Create new mining session
       const { data: sessionData, error: sessionError } = await supabase
@@ -206,23 +222,9 @@ const MiningPanel = () => {
   };
 
   const stopMiningSession = async () => {
-    if (!isConnected || !address || !sessionStartTime) return;
+    if (!isConnected || !address || !sessionStartTime || !userId) return;
     
     try {
-      // Get user id from wallet address
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('wallet_address', address.toLowerCase())
-        .single();
-        
-      if (userError) {
-        console.error('Error fetching user:', userError);
-        return;
-      }
-      
-      const userId = userData.id;
-      
       // Get latest mining session
       const { data: sessionData, error: sessionError } = await supabase
         .from('mining_sessions')
@@ -457,13 +459,15 @@ const MiningPanel = () => {
           ) : (
             <Button 
               onClick={toggleMining}
-              disabled={!isConnected || (dailyLimits.remaining <= 0 && !isMining)}
+              disabled={!isConnected || !userId || (dailyLimits.remaining <= 0 && !isMining)}
               className={`w-40 h-40 rounded-full relative button-pulse flex flex-col items-center justify-center ${
                 isMining 
                   ? "bg-red-500 hover:bg-red-600" 
-                  : dailyLimits.remaining <= 0
+                  : !userId
                     ? "bg-corepulse-gray-400 cursor-not-allowed"
-                    : "bg-corepulse-orange hover:bg-corepulse-orange-hover"
+                    : dailyLimits.remaining <= 0
+                      ? "bg-corepulse-gray-400 cursor-not-allowed"
+                      : "bg-corepulse-orange hover:bg-corepulse-orange-hover"
               }`}
             >
               <span className="text-lg font-bold mb-1">{isMining ? 'Stop' : 'Start'}</span>
@@ -483,7 +487,10 @@ const MiningPanel = () => {
                 <span>{dailyLimits.minutesUsed} / {dailyLimits.maxMinutes} minutes</span>
               </div>
               <Progress value={dailyLimitPercentage} className="h-2" />
-              {dailyLimits.remaining <= 0 && !isMining && (
+              {!userId && (
+                <p className="text-center text-red-500 text-sm">User profile not found. Try reconnecting your wallet.</p>
+              )}
+              {userId && dailyLimits.remaining <= 0 && !isMining && (
                 <p className="text-center text-red-500 text-sm">Daily limit reached. Come back tomorrow!</p>
               )}
             </div>

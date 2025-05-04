@@ -45,6 +45,8 @@ const modal = createWeb3Modal({
 // Function to track wallet connection in the database
 const trackWalletConnection = async (address: string) => {
   try {
+    console.log("Tracking wallet connection for:", address);
+    
     // Check if user exists
     const { data: existingUser, error: fetchError } = await supabase
       .from('users')
@@ -57,8 +59,12 @@ const trackWalletConnection = async (address: string) => {
       return;
     }
     
+    console.log("Existing user check result:", existingUser);
+    
     // If user doesn't exist, create new user
     if (!existingUser) {
+      console.log("Creating new user for wallet:", address.toLowerCase());
+      
       // Create user with explicit fields to avoid RLS policy issues
       const { data, error: insertError } = await supabase
         .from('users')
@@ -171,6 +177,7 @@ const WalletConnectionTracker = () => {
   
   useEffect(() => {
     if (isConnected && address) {
+      console.log("Wallet connected, tracking connection:", address);
       trackWalletConnection(address);
     }
   }, [isConnected, address]);
