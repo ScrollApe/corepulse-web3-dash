@@ -295,10 +295,19 @@ const MiningPanel = () => {
       }
         
       // Update user's total mined amount - Using proper typing
+      // First call the RPC function to get the new value
+      const { data: newTotalMined, error: rpcError } = await supabase.rpc('increment', { x: earned });
+      
+      if (rpcError) {
+        console.error('Error calculating new total mined:', rpcError);
+        return;
+      }
+      
+      // Then update the user with the returned value
       const updateUserResult = await supabase
         .from('users')
         .update({
-          total_mined: supabase.rpc('increment', { x: earned }),
+          total_mined: newTotalMined,
         })
         .eq('id', userId);
         
@@ -309,10 +318,18 @@ const MiningPanel = () => {
       // Update daily limits - Using proper typing
       const today = now.toISOString().split('T')[0];
       
+      // First call the RPC function to get the new minutes value
+      const { data: newMinutes, error: minutesRpcError } = await supabase.rpc('increment', { x: durationMinutes });
+      
+      if (minutesRpcError) {
+        console.error('Error calculating new minutes:', minutesRpcError);
+        return;
+      }
+      
       const updateLimitResult = await supabase
         .from('daily_mining_limits')
         .update({
-          minutes_mined: supabase.rpc('increment', { x: durationMinutes }),
+          minutes_mined: newMinutes,
           last_mining_session_id: sessionData.id,
         })
         .eq('user_id', userId)
