@@ -39,6 +39,8 @@ const MiningPanel = () => {
       
       try {
         setIsLoading(true);
+        console.log("Checking database for wallet address:", address.toLowerCase());
+        
         const { data, error } = await supabase
           .from('users')
           .select('id')
@@ -292,22 +294,22 @@ const MiningPanel = () => {
         return;
       }
         
-      // Update user's total mined amount
-      const { error: userUpdateError } = await supabase
+      // Update user's total mined amount - Using proper typing
+      const updateUserResult = await supabase
         .from('users')
         .update({
           total_mined: supabase.rpc('increment', { x: earned }),
         })
         .eq('id', userId);
         
-      if (userUpdateError) {
-        console.error('Error updating user total mined:', userUpdateError);
+      if (updateUserResult.error) {
+        console.error('Error updating user total mined:', updateUserResult.error);
       }
         
-      // Update daily limits
+      // Update daily limits - Using proper typing
       const today = now.toISOString().split('T')[0];
       
-      const { error: limitUpdateError } = await supabase
+      const updateLimitResult = await supabase
         .from('daily_mining_limits')
         .update({
           minutes_mined: supabase.rpc('increment', { x: durationMinutes }),
@@ -316,8 +318,8 @@ const MiningPanel = () => {
         .eq('user_id', userId)
         .eq('date', today);
         
-      if (limitUpdateError) {
-        console.error('Error updating daily limits:', limitUpdateError);
+      if (updateLimitResult.error) {
+        console.error('Error updating daily limits:', updateLimitResult.error);
       }
         
       // Log activity

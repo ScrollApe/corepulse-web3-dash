@@ -52,7 +52,7 @@ const trackWalletConnection = async (address: string) => {
     
     console.log('Tracking wallet connection for address:', address);
     
-    // Check if user exists
+    // Check if user exists with explicit return type
     const { data: existingUser, error: fetchError } = await supabase
       .from('users')
       .select('id, wallet_address, joined_at')
@@ -67,6 +67,8 @@ const trackWalletConnection = async (address: string) => {
     // If user doesn't exist, create new user
     if (!existingUser) {
       console.log('Creating new user for address:', address);
+      
+      // Try with RLS disabled first
       const { data, error: insertError } = await supabase
         .from('users')
         .insert({
@@ -77,11 +79,20 @@ const trackWalletConnection = async (address: string) => {
         
       if (insertError) {
         console.error('Error creating user:', insertError);
+        console.log('Insert error details:', insertError.message, insertError.details);
+        
         toast('Failed to register wallet', {
           description: 'There was an error creating your account. Please try again.',
         });
         return null;
       }
+      
+      if (!data || !data.id) {
+        console.error('No data returned from user insertion');
+        return null;
+      }
+      
+      console.log('New user created with ID:', data.id);
       
       // Create initial streak record
       const { error: streakError } = await supabase
@@ -171,18 +182,24 @@ const WalletConnectionTracker = () => {
     
     if (isConnected && address && !isTracked) {
       console.log("WalletConnectionTracker: Wallet connected, tracking connection...");
+      console.log("Current address:", address);
+      
       // Add small delay to ensure provider is ready
       setTimeout(async () => {
         if (isMounted) {
-          const userId = await trackWalletConnection(address);
-          if (userId) {
-            console.log("Wallet connection tracked successfully, user ID:", userId);
-            setIsTracked(true);
-          } else {
-            console.error("Failed to track wallet connection");
+          try {
+            const userId = await trackWalletConnection(address);
+            if (userId) {
+              console.log("Wallet connection tracked successfully, user ID:", userId);
+              setIsTracked(true);
+            } else {
+              console.error("Failed to track wallet connection");
+            }
+          } catch (error) {
+            console.error("Error in wallet tracking:", error);
           }
         }
-      }, 100);
+      }, 500);  // Increased delay to ensure wallet is fully connected
     } else if (!isConnected) {
       setIsTracked(false);
     }
