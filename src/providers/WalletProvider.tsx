@@ -117,20 +117,20 @@ const trackWalletConnection = async (address: string) => {
       
       // Update streak if needed
       const today = new Date().toISOString().split('T')[0];
-      const lastCheckIn = existingUser.last_check_in 
-        ? new Date(existingUser.last_check_in).toISOString().split('T')[0] 
-        : null;
       
-      if (today !== lastCheckIn) {
-        // It's a new day, update streak
-        const { data: streakData } = await supabase
-          .from('streaks')
-          .select('current_streak_days, last_check_in')
-          .eq('user_id', existingUser.id)
-          .single();
-          
-        if (streakData) {
-          const lastDate = streakData.last_check_in ? new Date(streakData.last_check_in) : null;
+      // Get the streak record for the user
+      const { data: streakData, error: streakFetchError } = await supabase
+        .from('streaks')
+        .select('current_streak_days, last_check_in')
+        .eq('user_id', existingUser.id)
+        .single();
+        
+      if (!streakFetchError && streakData) {
+        const lastDate = streakData.last_check_in ? new Date(streakData.last_check_in) : null;
+        const lastCheckInDate = lastDate ? lastDate.toISOString().split('T')[0] : null;
+        
+        if (today !== lastCheckInDate) {
+          // It's a new day, update streak
           const yesterday = new Date();
           yesterday.setDate(yesterday.getDate() - 1);
           
@@ -146,6 +146,8 @@ const trackWalletConnection = async (address: string) => {
             })
             .eq('user_id', existingUser.id);
         }
+      } else if (streakFetchError) {
+        console.error('Error fetching streak data:', streakFetchError);
       }
       
       toast('Welcome back!', {
