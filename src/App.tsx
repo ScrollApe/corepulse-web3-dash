@@ -14,7 +14,19 @@ import Lore from "./pages/Lore";
 import NotFound from "./pages/NotFound";
 import CrewDirectory from "./pages/CrewDirectory";
 
-const queryClient = new QueryClient();
+// Create a new query client with retry configuration
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 2,
+      refetchOnWindowFocus: false,
+      staleTime: 60000,
+    },
+    mutations: {
+      retry: 1,
+    },
+  },
+});
 
 const App = () => (
   <WalletProvider>
@@ -22,7 +34,7 @@ const App = () => (
       <ActivityProvider>
         <TooltipProvider>
           <Toaster />
-          <Sonner />
+          <Sonner position="top-right" closeButton={true} />
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Index />} />

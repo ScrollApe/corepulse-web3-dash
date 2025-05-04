@@ -51,12 +51,13 @@ const trackWalletConnection = async (address: string) => {
     }
     
     console.log('Tracking wallet connection for address:', address);
+    const formattedAddress = address.toLowerCase();
     
     // Check if user exists with explicit return type
     const { data: existingUser, error: fetchError } = await supabase
       .from('users')
       .select('id, wallet_address, joined_at')
-      .eq('wallet_address', address.toLowerCase())
+      .eq('wallet_address', formattedAddress)
       .maybeSingle();
       
     if (fetchError) {
@@ -66,24 +67,33 @@ const trackWalletConnection = async (address: string) => {
     
     // If user doesn't exist, create new user
     if (!existingUser) {
-      console.log('Creating new user for address:', address);
+      console.log('Creating new user for address:', formattedAddress);
       
-      // Try with RLS disabled first
+      // Create new user with direct insert
       const { data, error: insertError } = await supabase
         .from('users')
-        .insert({
-          wallet_address: address.toLowerCase(),
-        })
+        .insert([
+          { wallet_address: formattedAddress }
+        ])
         .select('id')
         .single();
         
       if (insertError) {
         console.error('Error creating user:', insertError);
-        console.log('Insert error details:', insertError.message, insertError.details);
+        console.error('Insert error details:', insertError.message, insertError.details);
         
-        toast('Failed to register wallet', {
-          description: 'There was an error creating your account. Please try again.',
-        });
+        // If there's an RLS error, try logging it more explicitly
+        if (insertError.message.includes('row-level security')) {
+          console.error('RLS policy preventing insert. Make sure your RLS policies allow insertion for this table.');
+          
+          toast('Failed to register wallet', {
+            description: 'There was a security error creating your account. Please try again later.',
+          });
+        } else {
+          toast('Failed to register wallet', {
+            description: 'There was an error creating your account. Please try again.',
+          });
+        }
         return null;
       }
       
@@ -97,9 +107,9 @@ const trackWalletConnection = async (address: string) => {
       // Create initial streak record
       const { error: streakError } = await supabase
         .from('streaks')
-        .insert({
-          user_id: data.id,
-        });
+        .insert([
+          { user_id: data.id }
+        ]);
       
       if (streakError) {
         console.error('Error creating initial streak:', streakError);
@@ -111,16 +121,16 @@ const trackWalletConnection = async (address: string) => {
       
       return data.id;
     } else {
-      console.log('User exists for address:', address, 'with ID:', existingUser.id);
+      console.log('User exists for address:', formattedAddress, 'with ID:', existingUser.id);
       
       // User exists, log wallet connection
       const { error: activityError } = await supabase
         .from('user_activities')
-        .insert({
+        .insert([{
           user_id: existingUser.id,
           activity: 'wallet_connect',
           metadata: {},
-        });
+        }]);
         
       if (activityError) {
         console.error('Error logging activity:', activityError);
@@ -137,28 +147,53 @@ const trackWalletConnection = async (address: string) => {
         .single();
         
       if (!streakFetchError && streakData) {
-        const lastDate = streakData.last_check_in ? new Date(streakData.last_check_in) : null;
-        const lastCheckInDate = lastDate ? lastDate.toISOString().split('T')[0] : null;
-        
-        if (today !== lastCheckInDate) {
-          // It's a new day, update streak
-          const yesterday = new Date();
-          yesterday.setDate(yesterday.getDate() - 1);
+        // Ensure we have the last_check_in property before proceeding
+        if (streakData.last_check_in) {
+          const lastDate = new Date(streakData.last_check_in);
+          const lastCheckInDate = lastDate.toISOString().split('T')[0];
           
-          // Check if last check-in was yesterday (to maintain streak)
-          const isConsecutiveDay = lastDate && 
-            lastDate.toISOString().split('T')[0] === yesterday.toISOString().split('T')[0];
-          
+          if (today !== lastCheckInDate) {
+            // It's a new day, update streak
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            
+            // Check if last check-in was yesterday (to maintain streak)
+            const isConsecutiveDay = lastCheckInDate === yesterday.toISOString().split('T')[0];
+            
+            await supabase
+              .from('streaks')
+              .update({
+                current_streak_days: isConsecutiveDay ? streakData.current_streak_days + 1 : 1,
+                last_check_in: new Date().toISOString(),
+              })
+              .eq('user_id', existingUser.id);
+          }
+        } else {
+          // No last check-in date, initialize it
           await supabase
             .from('streaks')
             .update({
-              current_streak_days: isConsecutiveDay ? streakData.current_streak_days + 1 : 1,
               last_check_in: new Date().toISOString(),
             })
             .eq('user_id', existingUser.id);
         }
       } else if (streakFetchError) {
         console.error('Error fetching streak data:', streakFetchError);
+        
+        // If streak record doesn't exist, create it
+        if (streakFetchError.code === 'PGRST116') {
+          const { error: createStreakError } = await supabase
+            .from('streaks')
+            .insert([{
+              user_id: existingUser.id,
+              current_streak_days: 1,
+              last_check_in: new Date().toISOString(),
+            }]);
+            
+          if (createStreakError) {
+            console.error('Error creating streak record:', createStreakError);
+          }
+        }
       }
       
       toast('Welcome back!', {
@@ -169,6 +204,9 @@ const trackWalletConnection = async (address: string) => {
     }
   } catch (error) {
     console.error('Error tracking wallet connection:', error);
+    toast('Connection Error', {
+      description: 'There was an error tracking your wallet connection.',
+    });
     return null;
   }
 };
@@ -176,6 +214,7 @@ const trackWalletConnection = async (address: string) => {
 const WalletConnectionTracker = () => {
   const { address, isConnected } = useAccount();
   const [isTracked, setIsTracked] = useState(false);
+  const [trackingAttempts, setTrackingAttempts] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -184,7 +223,7 @@ const WalletConnectionTracker = () => {
       console.log("WalletConnectionTracker: Wallet connected, tracking connection...");
       console.log("Current address:", address);
       
-      // Add small delay to ensure provider is ready
+      // Add delay to ensure provider is ready
       setTimeout(async () => {
         if (isMounted) {
           try {
@@ -192,22 +231,38 @@ const WalletConnectionTracker = () => {
             if (userId) {
               console.log("Wallet connection tracked successfully, user ID:", userId);
               setIsTracked(true);
+              setTrackingAttempts(0); // Reset attempts on success
             } else {
               console.error("Failed to track wallet connection");
+              
+              // If we've tried less than 3 times, try again
+              if (trackingAttempts < 3) {
+                setTrackingAttempts(prev => prev + 1);
+                setIsTracked(false); // Ensure we retry on next render
+              } else {
+                console.error("Maximum tracking attempts reached");
+                toast('Connection Issue', {
+                  description: 'We had trouble connecting your wallet to our systems. Please try again later.',
+                });
+              }
             }
           } catch (error) {
             console.error("Error in wallet tracking:", error);
+            toast('Connection Error', {
+              description: 'There was an unexpected error connecting your wallet.',
+            });
           }
         }
-      }, 500);  // Increased delay to ensure wallet is fully connected
+      }, 1000);  // Increased delay to ensure wallet is fully connected
     } else if (!isConnected) {
       setIsTracked(false);
+      setTrackingAttempts(0); // Reset attempts when disconnected
     }
     
     return () => {
       isMounted = false;
     };
-  }, [isConnected, address, isTracked]);
+  }, [isConnected, address, isTracked, trackingAttempts]);
   
   return null;
 };
@@ -232,6 +287,7 @@ export function useWalletConnect() {
   return {
     connect: () => {
       try {
+        console.log("Opening wallet connect modal...");
         modal.open();
       } catch (error) {
         console.error("Failed to connect wallet:", error);
