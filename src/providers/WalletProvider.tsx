@@ -45,45 +45,63 @@ const modal = createWeb3Modal({
 // Function to track wallet connection in the database
 const trackWalletConnection = async (address: string) => {
   try {
+    if (!address) {
+      console.error('Cannot track wallet connection: No address provided');
+      return null;
+    }
+    
+    console.log('Tracking wallet connection for address:', address);
+    
     // Check if user exists
     const { data: existingUser, error: fetchError } = await supabase
       .from('users')
-      .select()
+      .select('id, wallet_address, joined_at')
       .eq('wallet_address', address.toLowerCase())
       .maybeSingle();
       
-    if (fetchError && fetchError.code !== 'PGRST116') {
+    if (fetchError) {
       console.error('Error checking for existing user:', fetchError);
-      return;
+      return null;
     }
     
     // If user doesn't exist, create new user
     if (!existingUser) {
+      console.log('Creating new user for address:', address);
       const { data, error: insertError } = await supabase
         .from('users')
         .insert({
           wallet_address: address.toLowerCase(),
         })
-        .select()
+        .select('id')
         .single();
         
       if (insertError) {
         console.error('Error creating user:', insertError);
-        return;
+        toast('Failed to register wallet', {
+          description: 'There was an error creating your account. Please try again.',
+        });
+        return null;
       }
       
       // Create initial streak record
-      await supabase
+      const { error: streakError } = await supabase
         .from('streaks')
         .insert({
           user_id: data.id,
         });
+      
+      if (streakError) {
+        console.error('Error creating initial streak:', streakError);
+      }
         
       toast('Welcome to CorePulse!', {
         description: 'Your account has been created.',
       });
       
+      return data.id;
     } else {
+      console.log('User exists for address:', address, 'with ID:', existingUser.id);
+      
       // User exists, log wallet connection
       const { error: activityError } = await supabase
         .from('user_activities')
@@ -99,7 +117,9 @@ const trackWalletConnection = async (address: string) => {
       
       // Update streak if needed
       const today = new Date().toISOString().split('T')[0];
-      const lastCheckIn = new Date(existingUser.last_check_in || 0).toISOString().split('T')[0];
+      const lastCheckIn = existingUser.last_check_in 
+        ? new Date(existingUser.last_check_in).toISOString().split('T')[0] 
+        : null;
       
       if (today !== lastCheckIn) {
         // It's a new day, update streak
@@ -110,12 +130,13 @@ const trackWalletConnection = async (address: string) => {
           .single();
           
         if (streakData) {
-          const lastDate = new Date(streakData.last_check_in);
+          const lastDate = streakData.last_check_in ? new Date(streakData.last_check_in) : null;
           const yesterday = new Date();
           yesterday.setDate(yesterday.getDate() - 1);
           
           // Check if last check-in was yesterday (to maintain streak)
-          const isConsecutiveDay = lastDate.toISOString().split('T')[0] === yesterday.toISOString().split('T')[0];
+          const isConsecutiveDay = lastDate && 
+            lastDate.toISOString().split('T')[0] === yesterday.toISOString().split('T')[0];
           
           await supabase
             .from('streaks')
@@ -130,20 +151,44 @@ const trackWalletConnection = async (address: string) => {
       toast('Welcome back!', {
         description: 'Your wallet has been connected.',
       });
+      
+      return existingUser.id;
     }
   } catch (error) {
     console.error('Error tracking wallet connection:', error);
+    return null;
   }
 };
 
 const WalletConnectionTracker = () => {
   const { address, isConnected } = useAccount();
-  
+  const [isTracked, setIsTracked] = useState(false);
+
   useEffect(() => {
-    if (isConnected && address) {
-      trackWalletConnection(address);
+    let isMounted = true;
+    
+    if (isConnected && address && !isTracked) {
+      console.log("WalletConnectionTracker: Wallet connected, tracking connection...");
+      // Add small delay to ensure provider is ready
+      setTimeout(async () => {
+        if (isMounted) {
+          const userId = await trackWalletConnection(address);
+          if (userId) {
+            console.log("Wallet connection tracked successfully, user ID:", userId);
+            setIsTracked(true);
+          } else {
+            console.error("Failed to track wallet connection");
+          }
+        }
+      }, 100);
+    } else if (!isConnected) {
+      setIsTracked(false);
     }
-  }, [isConnected, address]);
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [isConnected, address, isTracked]);
   
   return null;
 };
