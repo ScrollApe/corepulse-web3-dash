@@ -1,40 +1,15 @@
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import PulseWave from '@/components/ui/PulseWave';
-import { Link, useParams, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useWalletConnect } from '@/providers/WalletProvider';
 import { useAccount } from 'wagmi';
-import { toast } from '@/components/ui/sonner';
-import { useReferralSystem } from '@/hooks/useReferralSystem';
 
 const Index = () => {
   const { connect } = useWalletConnect();
   const { isConnected } = useAccount();
-  const navigate = useNavigate();
-  const { referralCode: urlReferralCode } = useParams();
-  const { applyReferralCode } = useReferralSystem();
-  
-  // Extract referral code from URL path
-  const referralCode = urlReferralCode || 
-    (window.location.pathname.startsWith('/ref/') ? 
-    window.location.pathname.split('/ref/')[1] : null);
-  
-  useEffect(() => {
-    const handleReferral = async () => {
-      if (referralCode && isConnected) {
-        const success = await applyReferralCode(referralCode);
-        if (success) {
-          navigate('/dashboard');
-        }
-      }
-    };
-    
-    if (referralCode && isConnected) {
-      handleReferral();
-    }
-  }, [referralCode, isConnected, applyReferralCode, navigate]);
 
   return (
     <Layout>
@@ -68,14 +43,6 @@ const Index = () => {
                   Learn More
                 </Button>
               </div>
-              
-              {referralCode && (
-                <div className="mt-6 p-4 border border-corepulse-orange/30 bg-corepulse-orange/10 rounded-lg">
-                  <p className="text-corepulse-orange font-medium">
-                    You were referred by a friend! Connect your wallet to get a 5% mining bonus.
-                  </p>
-                </div>
-              )}
             </div>
             <div className="md:w-1/2 relative">
               <div className="w-64 h-64 mx-auto relative">

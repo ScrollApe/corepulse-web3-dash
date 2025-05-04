@@ -20,10 +20,8 @@ const Navbar = () => {
     { title: "Dashboard", href: "/dashboard" },
     { title: "Mint NFT", href: "/mint" },
     { title: "Leaderboard", href: "/leaderboard" },
-    { title: "Crews", href: "/crews" },
-    { title: "Challenges", href: "/weekly-challenges" },
-    { title: "Achievements", href: "/achievements" },
-    { title: "Lore", href: "/lore" }
+    { title: "Crew", href: "/crews" },
+    { title: "Lore & Challenges", href: "/lore" }
   ];
 
   const isActive = (path: string) => {
@@ -49,12 +47,12 @@ const Navbar = () => {
           </Link>
           
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-2">
+          <nav className="hidden md:flex items-center space-x-4">
             {links.map((link) => (
               <Link 
                 key={link.href} 
                 to={link.href} 
-                className={`px-2 py-2 rounded-md text-sm font-medium transition-colors ${
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                   isActive(link.href)
                     ? "text-corepulse-orange border-b-2 border-corepulse-orange"
                     : "text-corepulse-gray-600 hover:text-corepulse-orange hover:border-b-2 hover:border-corepulse-orange-light"
@@ -64,7 +62,7 @@ const Navbar = () => {
               </Link>
             ))}
             <Button 
-              className="ml-2 bg-corepulse-orange hover:bg-corepulse-orange-hover transition-colors flex items-center gap-2"
+              className="ml-4 bg-corepulse-orange hover:bg-corepulse-orange-hover transition-colors flex items-center gap-2"
               onClick={() => connect()}
             >
               <Wallet className="w-4 h-4" />

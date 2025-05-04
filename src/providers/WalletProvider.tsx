@@ -45,12 +45,10 @@ const modal = createWeb3Modal({
 // Function to track wallet connection in the database
 const trackWalletConnection = async (address: string) => {
   try {
-    console.log("Tracking wallet connection for:", address);
-    
     // Check if user exists
     const { data: existingUser, error: fetchError } = await supabase
       .from('users')
-      .select('id')
+      .select()
       .eq('wallet_address', address.toLowerCase())
       .maybeSingle();
       
@@ -59,94 +57,33 @@ const trackWalletConnection = async (address: string) => {
       return;
     }
     
-    console.log("Existing user check result:", existingUser);
-    
     // If user doesn't exist, create new user
     if (!existingUser) {
-      console.log("Creating new user for wallet:", address.toLowerCase());
-      
-      // Create user with explicit fields to avoid RLS policy issues
       const { data, error: insertError } = await supabase
         .from('users')
         .insert({
           wallet_address: address.toLowerCase(),
-          level: 1,
-          experience: 0,
-          next_level_exp: 100,
-          total_mined: 0,
-          avatar_stage: 1
         })
         .select()
         .single();
         
       if (insertError) {
         console.error('Error creating user:', insertError);
-        toast("Error Creating Profile", {
-          description: "Could not create your user profile. Please try again.",
-        });
         return;
       }
       
-      console.log("Created new user:", data);
-      
       // Create initial streak record
-      const { error: streakError } = await supabase
+      await supabase
         .from('streaks')
         .insert({
           user_id: data.id,
-          current_streak_days: 1,
-          last_check_in: new Date().toISOString()
         });
         
-      if (streakError) {
-        console.error('Error creating streak record:', streakError);
-      }
-        
-      // Create initial activity
-      const { error: activityError } = await supabase
-        .from('user_activities')
-        .insert({
-          user_id: data.id,
-          activity: 'wallet_connect',
-          metadata: {}
-        });
-        
-      if (activityError) {
-        console.error('Error creating activity record:', activityError);
-      }
-      
-      // Try to unlock the Early Adopter achievement
-      try {
-        // Get current epoch
-        const { data: epochId } = await supabase.rpc('get_current_epoch_id');
-        
-        if (epochId === 1) { // First epoch
-          const { data: achievementData, error: achievementError } = await supabase
-            .from('achievements')
-            .select('id')
-            .eq('name', 'Early Adopter')
-            .single();
-            
-          if (!achievementError && achievementData) {
-            await supabase
-              .from('user_achievements')
-              .insert({
-                user_id: data.id,
-                achievement_id: achievementData.id
-              });
-          }
-        }
-      } catch (error) {
-        console.error('Error unlocking achievement:', error);
-      }
-      
       toast('Welcome to CorePulse!', {
         description: 'Your account has been created.',
       });
       
     } else {
-      console.log("Found existing user:", existingUser);
-      
       // User exists, log wallet connection
       const { error: activityError } = await supabase
         .from('user_activities')
@@ -160,15 +97,42 @@ const trackWalletConnection = async (address: string) => {
         console.error('Error logging activity:', activityError);
       }
       
+      // Update streak if needed
+      const today = new Date().toISOString().split('T')[0];
+      const lastCheckIn = new Date(existingUser.last_check_in || 0).toISOString().split('T')[0];
+      
+      if (today !== lastCheckIn) {
+        // It's a new day, update streak
+        const { data: streakData } = await supabase
+          .from('streaks')
+          .select('current_streak_days, last_check_in')
+          .eq('user_id', existingUser.id)
+          .single();
+          
+        if (streakData) {
+          const lastDate = new Date(streakData.last_check_in);
+          const yesterday = new Date();
+          yesterday.setDate(yesterday.getDate() - 1);
+          
+          // Check if last check-in was yesterday (to maintain streak)
+          const isConsecutiveDay = lastDate.toISOString().split('T')[0] === yesterday.toISOString().split('T')[0];
+          
+          await supabase
+            .from('streaks')
+            .update({
+              current_streak_days: isConsecutiveDay ? streakData.current_streak_days + 1 : 1,
+              last_check_in: new Date().toISOString(),
+            })
+            .eq('user_id', existingUser.id);
+        }
+      }
+      
       toast('Welcome back!', {
         description: 'Your wallet has been connected.',
       });
     }
   } catch (error) {
     console.error('Error tracking wallet connection:', error);
-    toast("Connection Error", {
-      description: "There was an issue with your wallet connection.",
-    });
   }
 };
 
@@ -177,7 +141,6 @@ const WalletConnectionTracker = () => {
   
   useEffect(() => {
     if (isConnected && address) {
-      console.log("Wallet connected, tracking connection:", address);
       trackWalletConnection(address);
     }
   }, [isConnected, address]);

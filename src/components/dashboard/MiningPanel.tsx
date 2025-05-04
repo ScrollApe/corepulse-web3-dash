@@ -12,7 +12,6 @@ import { useActivity } from '@/providers/ActivityProvider';
 
 const MiningPanel = () => {
   const [isMining, setIsMining] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [rate, setRate] = useState(0.0012);
   const [earned, setEarned] = useState(0);
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
@@ -21,55 +20,29 @@ const MiningPanel = () => {
     maxMinutes: 240, // 4 hours default
     remaining: 240,
   });
-  const [userId, setUserId] = useState<string | null>(null);
   const { isConnected, address } = useAccount();
   const { connect } = useWalletConnect();
   const { logActivity } = useActivity();
   
-  // Fetch user ID when wallet is connected
+  // Fetch daily limits when component mounts or wallet connects
   useEffect(() => {
-    const fetchUserId = async () => {
+    const fetchDailyLimits = async () => {
       if (!isConnected || !address) return;
       
       try {
-        console.log("Fetching user ID for address:", address.toLowerCase());
-        
-        const { data, error } = await supabase
+        // Get user id from wallet address
+        const { data: userData, error: userError } = await supabase
           .from('users')
           .select('id')
           .eq('wallet_address', address.toLowerCase())
-          .maybeSingle();
+          .single();
           
-        if (error) {
-          console.error('Error fetching user ID:', error);
+        if (userError) {
+          console.error('Error fetching user:', userError);
           return;
         }
         
-        if (data) {
-          console.log("Found user ID:", data.id);
-          setUserId(data.id);
-        } else {
-          console.error("No user found for wallet address:", address.toLowerCase());
-          toast("User Profile Not Found", {
-            description: "Your wallet is connected but no user profile was found. Try disconnecting and reconnecting your wallet.",
-          });
-        }
-      } catch (err) {
-        console.error('Error in fetchUserId:', err);
-      }
-    };
-    
-    fetchUserId();
-  }, [isConnected, address]);
-  
-  // Fetch daily limits when user ID is available
-  useEffect(() => {
-    const fetchDailyLimits = async () => {
-      if (!userId) return;
-      
-      try {
-        setLoading(true);
-        
+        const userId = userData.id;
         const today = new Date().toISOString().split('T')[0];
         
         // Check if entry exists for today
@@ -108,15 +81,13 @@ const MiningPanel = () => {
         }
       } catch (error) {
         console.error('Error in fetchDailyLimits:', error);
-      } finally {
-        setLoading(false);
       }
     };
     
     fetchDailyLimits();
     
     // Set up realtime subscription
-    if (userId) {
+    if (isConnected && address) {
       const channel = supabase
         .channel('daily-limits-changes')
         .on(
@@ -143,7 +114,7 @@ const MiningPanel = () => {
         supabase.removeChannel(channel);
       };
     }
-  }, [userId]);
+  }, [isConnected, address]);
 
   // Handle mining calculation
   useEffect(() => {
@@ -170,15 +141,22 @@ const MiningPanel = () => {
       return;
     }
     
-    if (!userId) {
-      console.error("Cannot start mining: User ID not found");
-      toast("User Profile Not Found", {
-        description: "Your wallet is connected but no user profile was found. Try disconnecting and reconnecting your wallet.",
-      });
-      return;
-    }
-    
     try {
+      // Get user id from wallet address
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('wallet_address', address.toLowerCase())
+        .single();
+        
+      if (userError) {
+        console.error('Error fetching user:', userError);
+        toast("Error Starting Mining", {
+          description: "Could not retrieve your user profile.",
+        });
+        return;
+      }
+      
       // Check daily limits
       if (dailyLimits.remaining <= 0) {
         toast("Daily Limit Reached", {
@@ -186,6 +164,8 @@ const MiningPanel = () => {
         });
         return;
       }
+      
+      const userId = userData.id;
       
       // Create new mining session
       const { data: sessionData, error: sessionError } = await supabase
@@ -222,9 +202,23 @@ const MiningPanel = () => {
   };
 
   const stopMiningSession = async () => {
-    if (!isConnected || !address || !sessionStartTime || !userId) return;
+    if (!isConnected || !address || !sessionStartTime) return;
     
     try {
+      // Get user id from wallet address
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('wallet_address', address.toLowerCase())
+        .single();
+        
+      if (userError) {
+        console.error('Error fetching user:', userError);
+        return;
+      }
+      
+      const userId = userData.id;
+      
       // Get latest mining session
       const { data: sessionData, error: sessionError } = await supabase
         .from('mining_sessions')
@@ -254,55 +248,24 @@ const MiningPanel = () => {
         .eq('id', sessionData.id);
         
       // Update user's total mined amount
-      // Using a normal update with direct value addition instead of RPC calls
-      const { data: userData2, error: userDataError } = await supabase
+      await supabase
         .from('users')
-        .select('total_mined, experience')
-        .eq('id', userId)
-        .single();
-
-      if (userDataError) {
-        console.error('Error fetching user data:', userDataError);
-      } else {
-        const { error: updateUserError } = await supabase
-          .from('users')
-          .update({
-            total_mined: userData2.total_mined + earned,
-            experience: userData2.experience + Math.floor(earned * 10)
-          })
-          .eq('id', userId);
-
-        if (updateUserError) {
-          console.error('Error updating user totals:', updateUserError);
-        }
-      }
-
+        .update({
+          total_mined: supabase.rpc('increment', { x: earned }),
+        })
+        .eq('id', userId);
+        
       // Update daily limits
       const today = now.toISOString().split('T')[0];
       
-      const { data: dailyLimitData, error: dailyLimitDataError } = await supabase
+      await supabase
         .from('daily_mining_limits')
-        .select('minutes_mined')
+        .update({
+          minutes_mined: supabase.rpc('increment', { x: durationMinutes }),
+          last_mining_session_id: sessionData.id,
+        })
         .eq('user_id', userId)
-        .eq('date', today)
-        .single();
-
-      if (dailyLimitDataError) {
-        console.error('Error fetching daily limit data:', dailyLimitDataError);
-      } else {
-        const { error: updateLimitsError } = await supabase
-          .from('daily_mining_limits')
-          .update({
-            minutes_mined: dailyLimitData.minutes_mined + durationMinutes,
-            last_mining_session_id: sessionData.id,
-          })
-          .eq('user_id', userId)
-          .eq('date', today);
-
-        if (updateLimitsError) {
-          console.error('Error updating daily limits:', updateLimitsError);
-        }
-      }
+        .eq('date', today);
         
       // Log activity
       await logActivity('stop_mining', { 
@@ -310,94 +273,6 @@ const MiningPanel = () => {
         duration: durationMinutes,
         earned: earned.toFixed(6)
       });
-      
-      // Check for weekly challenges progress
-      const { data: challenges, error: challengesError } = await supabase
-        .from('weekly_challenges')
-        .select('id, goal')
-        .eq('challenge_type', 'mining')
-        .gte('end_date', now.toISOString());
-        
-      if (!challengesError && challenges && challenges.length > 0) {
-        // For each mining-related challenge, update progress
-        for (const challenge of challenges) {
-          // Check if user has this challenge
-          const { data: userChallenge, error: userChallengeError } = await supabase
-            .from('user_weekly_challenges')
-            .select('id, progress, completed')
-            .eq('user_id', userId)
-            .eq('challenge_id', challenge.id)
-            .single();
-            
-          if (userChallengeError && userChallengeError.code === 'PGRST116') {
-            // No record yet, create one
-            await supabase
-              .from('user_weekly_challenges')
-              .insert({
-                user_id: userId,
-                challenge_id: challenge.id,
-                progress: durationMinutes,
-                completed: durationMinutes >= challenge.goal
-              });
-          } else if (!userChallengeError && userChallenge && !userChallenge.completed) {
-            // Update existing challenge progress
-            const newProgress = userChallenge.progress + durationMinutes;
-            const completed = newProgress >= challenge.goal;
-            
-            await supabase
-              .from('user_weekly_challenges')
-              .update({
-                progress: newProgress,
-                completed,
-                completed_at: completed ? now.toISOString() : null
-              })
-              .eq('id', userChallenge.id);
-          }
-        }
-      }
-      
-      // Check for Mining Novice achievement
-      try {
-        // Get user's total mined amount
-        const { data: userMined, error: userMinedError } = await supabase
-          .from('users')
-          .select('total_mined')
-          .eq('id', userId)
-          .single();
-          
-        if (!userMinedError && userMined && userMined.total_mined >= 100) {
-          // Check if they already have the achievement
-          const { data: achievementData, error: achievementError } = await supabase
-            .from('achievements')
-            .select('id')
-            .eq('name', 'Mining Novice')
-            .single();
-            
-          if (!achievementError && achievementData) {
-            // Check if user already has this achievement
-            const { data: userAchievement, error: userAchievementError } = await supabase
-              .from('user_achievements')
-              .select('id')
-              .eq('user_id', userId)
-              .eq('achievement_id', achievementData.id)
-              .single();
-              
-            if (userAchievementError && userAchievementError.code === 'PGRST116') {
-              // User doesn't have achievement yet, add it
-              await supabase
-                .from('user_achievements')
-                .insert({
-                  user_id: userId,
-                  achievement_id: achievementData.id
-                });
-                
-              toast.success("Achievement Unlocked: Mining Novice!");
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error checking for achievements:', error);
-      }
       
       // Reset state
       setIsMining(false);
@@ -459,15 +334,13 @@ const MiningPanel = () => {
           ) : (
             <Button 
               onClick={toggleMining}
-              disabled={!isConnected || !userId || (dailyLimits.remaining <= 0 && !isMining)}
+              disabled={!isConnected || (dailyLimits.remaining <= 0 && !isMining)}
               className={`w-40 h-40 rounded-full relative button-pulse flex flex-col items-center justify-center ${
                 isMining 
                   ? "bg-red-500 hover:bg-red-600" 
-                  : !userId
+                  : dailyLimits.remaining <= 0
                     ? "bg-corepulse-gray-400 cursor-not-allowed"
-                    : dailyLimits.remaining <= 0
-                      ? "bg-corepulse-gray-400 cursor-not-allowed"
-                      : "bg-corepulse-orange hover:bg-corepulse-orange-hover"
+                    : "bg-corepulse-orange hover:bg-corepulse-orange-hover"
               }`}
             >
               <span className="text-lg font-bold mb-1">{isMining ? 'Stop' : 'Start'}</span>
@@ -487,10 +360,7 @@ const MiningPanel = () => {
                 <span>{dailyLimits.minutesUsed} / {dailyLimits.maxMinutes} minutes</span>
               </div>
               <Progress value={dailyLimitPercentage} className="h-2" />
-              {!userId && (
-                <p className="text-center text-red-500 text-sm">User profile not found. Try reconnecting your wallet.</p>
-              )}
-              {userId && dailyLimits.remaining <= 0 && !isMining && (
+              {dailyLimits.remaining <= 0 && !isMining && (
                 <p className="text-center text-red-500 text-sm">Daily limit reached. Come back tomorrow!</p>
               )}
             </div>

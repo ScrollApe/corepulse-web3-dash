@@ -1,578 +1,357 @@
 
-import React, { useEffect, useState } from 'react';
-import Layout from '@/components/layout/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
-import { supabase } from '@/integrations/supabase/client';
+import { Search, Users, ChevronDown } from 'lucide-react';
+import { toast } from '@/components/ui/sonner';
 import { useWalletConnect } from '@/providers/WalletProvider';
 import { useActivity } from '@/providers/ActivityProvider';
-import { toast } from '@/components/ui/sonner';
-import JoinCrewForm from '@/components/crews/JoinCrewForm';
-import CreateCrewForm from '@/components/crews/CreateCrewForm';
+import Layout from '@/components/layout/Layout';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { supabase } from '@/integrations/supabase/client';
 
-interface CrewMember {
-  user_id: string;
-  joined_at: string;
-  wallet_address: string;
-  total_mined: number;
-}
-
-interface Crew {
+// Define types for crews and crew members
+type Crew = {
   id: string;
   name: string;
   created_at: string;
   created_by: string;
-  member_count: number;
-  total_mined: number;
-  members: CrewMember[];
-  creator_wallet: string;
-}
+  _count?: {
+    members: number;
+    total_mined: number;
+  };
+};
+
+type CrewMember = {
+  id: string;
+  user_id: string;
+  crew_id: string;
+};
+
+type SortOption = 'newest' | 'most_members' | 'most_mined';
 
 const CrewDirectory = () => {
-  const [activeTab, setActiveTab] = useState('browse');
   const [crews, setCrews] = useState<Crew[]>([]);
-  const [userCrew, setUserCrew] = useState<Crew | null>(null);
-  const [loading, setLoading] = useState(true);
-  const { address, isConnected } = useAccount();
+  const [filteredCrews, setFilteredCrews] = useState<Crew[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<SortOption>('newest');
+  const [isLoading, setIsLoading] = useState(true);
+  const [userCrewId, setUserCrewId] = useState<string | null>(null);
+  const { isConnected, address } = useAccount();
   const { connect } = useWalletConnect();
   const { logActivity } = useActivity();
-  
+
+  // Fetch all crews and user's crew membership
   useEffect(() => {
     const fetchCrews = async () => {
-      if (!isConnected || !address) {
-        setLoading(false);
-        return;
-      }
-      
       try {
-        setLoading(true);
+        setIsLoading(true);
         
-        // Get user ID
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('id')
-          .eq('wallet_address', address.toLowerCase())
-          .single();
-        
-        if (userError) {
-          console.error('Error fetching user:', userError);
-          setLoading(false);
-          return;
-        }
-        
-        // Check if user is in a crew
-        const { data: memberData, error: memberError } = await supabase
-          .from('crew_members')
-          .select('crew_id')
-          .eq('user_id', userData.id)
-          .single();
-          
-        let userCrewData = null;
-        
-        if (!memberError && memberData) {
-          // User is in a crew, get crew details
-          const { data: crewData, error: crewError } = await supabase
-            .from('crews')
-            .select(`
-              *,
-              creator:created_by(wallet_address),
-              members:crew_members(
-                user_id,
-                joined_at,
-                user:user_id(wallet_address, total_mined)
-              )
-            `)
-            .eq('id', memberData.crew_id)
-            .single();
-            
-          if (!crewError && crewData) {
-            // Get total mined for crew
-            const { data: totalMined } = await supabase.rpc('get_crew_total_mined', {
-              crew_id: crewData.id
-            });
-            
-            userCrewData = {
-              id: crewData.id,
-              name: crewData.name,
-              created_at: crewData.created_at,
-              created_by: crewData.created_by,
-              creator_wallet: crewData.creator.wallet_address,
-              member_count: crewData.members.length,
-              total_mined: totalMined || 0,
-              members: crewData.members.map((member: any) => ({
-                user_id: member.user_id,
-                joined_at: member.joined_at,
-                wallet_address: member.user.wallet_address,
-                total_mined: member.user.total_mined
-              }))
-            };
-            
-            setUserCrew(userCrewData);
-            setActiveTab('my-crew');
-          }
-        }
-        
-        // Get all crews
-        const { data: allCrews, error: crewsError } = await supabase
+        // Fetch all crews with member count and total mined aggregation
+        const { data: crewsData, error: crewsError } = await supabase
           .from('crews')
-          .select(`
-            *,
-            creator:users!crews_created_by_fkey(wallet_address),
-            members:crew_members(id)
-          `)
-          .order('created_at', { ascending: false });
-        
-        if (crewsError) {
-          console.error('Error fetching crews:', crewsError);
-          setLoading(false);
-          return;
-        }
-        
-        // Get mining stats for each crew
+          .select('*');
+
+        if (crewsError) throw crewsError;
+
+        // For each crew, get member count and total mined
         const crewsWithStats = await Promise.all(
-          allCrews.map(async (crew: any) => {
-            const { data: totalMined } = await supabase.rpc('get_crew_total_mined', {
-              crew_id: crew.id
-            });
+          crewsData.map(async (crew) => {
+            // Get member count
+            const { count: membersCount } = await supabase
+              .from('crew_members')
+              .select('id', { count: 'exact', head: true })
+              .eq('crew_id', crew.id);
+              
+            // Get sum of total_mined from users who are crew members
+            // Fix: Ensure proper typing of the RPC function call
+            const { data: minerData, error: minerError } = await supabase
+              .rpc('get_crew_total_mined', { crew_id: crew.id }) as { data: number | null, error: any };
             
-            return {
-              id: crew.id,
-              name: crew.name,
-              created_at: crew.created_at,
-              created_by: crew.created_by,
-              creator_wallet: crew.creator?.wallet_address,
-              member_count: crew.members.length,
-              total_mined: totalMined || 0,
-              members: []
+            if (minerError) {
+              console.error('Error getting crew total mined:', minerError);
+            }
+            
+            const totalMined = minerData || 0;
+              
+            return { 
+              ...crew, 
+              _count: { 
+                members: membersCount || 0,
+                total_mined: totalMined 
+              } 
             };
           })
         );
-        
+
         setCrews(crewsWithStats);
-      } catch (error) {
-        console.error('Error in fetchCrews:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchCrews();
-    
-    // Set up real-time subscriptions for crews and members
-    if (isConnected) {
-      const channel = supabase
-        .channel('crew-changes')
-        .on('postgres_changes', 
-          { event: '*', schema: 'public', table: 'crews' }, 
-          fetchCrews
-        )
-        .on('postgres_changes', 
-          { event: '*', schema: 'public', table: 'crew_members' }, 
-          fetchCrews
-        )
-        .subscribe();
-        
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
-  }, [address, isConnected]);
-  
-  // Leave crew
-  const handleLeaveCrew = async () => {
-    if (!isConnected || !address || !userCrew) return;
-    
-    try {
-      // Get user ID
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('wallet_address', address.toLowerCase())
-        .single();
-      
-      if (userError) {
-        console.error('Error fetching user:', userError);
-        return;
-      }
-      
-      // Check if user is the creator
-      if (userCrew.creator_wallet === address.toLowerCase()) {
-        toast.error("Crew creators cannot leave their crew");
-        return;
-      }
-      
-      // Remove from crew
-      const { error: leaveError } = await supabase
-        .from('crew_members')
-        .delete()
-        .eq('user_id', userData.id);
-        
-      if (leaveError) {
-        console.error('Error leaving crew:', leaveError);
-        toast.error("Failed to leave crew");
-        return;
-      }
-      
-      // Log activity
-      await logActivity('leave_crew', { crew_id: userCrew.id });
-      
-      toast.success("Successfully left crew");
-      setUserCrew(null);
-      setActiveTab('browse');
-      
-    } catch (error) {
-      console.error('Error in handleLeaveCrew:', error);
-      toast.error("An error occurred");
-    }
-  };
-  
-  // Format wallet address
-  const formatAddress = (address: string) => {
-    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
-  };
-  
-  // Handle successful crew creation or join
-  const handleCrewSuccess = () => {
-    // Refresh crews data
-    const fetchCrews = async () => {
-      if (!isConnected || !address) return;
-      
-      try {
-        // Get user ID
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('id')
-          .eq('wallet_address', address.toLowerCase())
-          .single();
-        
-        if (userError) {
-          console.error('Error fetching user:', userError);
-          return;
-        }
-        
-        // Check if user is in a crew
-        const { data: memberData, error: memberError } = await supabase
-          .from('crew_members')
-          .select('crew_id')
-          .eq('user_id', userData.id)
-          .single();
-          
-        if (!memberError && memberData) {
-          // User is in a crew, get crew details
-          const { data: crewData, error: crewError } = await supabase
-            .from('crews')
-            .select(`
-              *,
-              creator:created_by(wallet_address),
-              members:crew_members(
-                user_id,
-                joined_at,
-                user:user_id(wallet_address, total_mined)
-              )
-            `)
-            .eq('id', memberData.crew_id)
+        setFilteredCrews(crewsWithStats);
+
+        // If user is connected, check if they belong to a crew
+        if (isConnected && address) {
+          const { data: userData } = await supabase
+            .from('users')
+            .select('id')
+            .eq('wallet_address', address.toLowerCase())
             .single();
             
-          if (!crewError && crewData) {
-            // Get total mined for crew
-            const { data: totalMined } = await supabase.rpc('get_crew_total_mined', {
-              crew_id: crewData.id
-            });
-            
-            const userCrewData = {
-              id: crewData.id,
-              name: crewData.name,
-              created_at: crewData.created_at,
-              created_by: crewData.created_by,
-              creator_wallet: crewData.creator.wallet_address,
-              member_count: crewData.members.length,
-              total_mined: totalMined || 0,
-              members: crewData.members.map((member: any) => ({
-                user_id: member.user_id,
-                joined_at: member.joined_at,
-                wallet_address: member.user.wallet_address,
-                total_mined: member.user.total_mined
-              }))
-            };
-            
-            setUserCrew(userCrewData);
-            setActiveTab('my-crew');
+          if (userData) {
+            const { data: crewMemberData } = await supabase
+              .from('crew_members')
+              .select('crew_id')
+              .eq('user_id', userData.id)
+              .single();
+              
+            if (crewMemberData) {
+              setUserCrewId(crewMemberData.crew_id);
+            }
           }
         }
       } catch (error) {
-        console.error('Error in handleCrewSuccess:', error);
+        console.error('Error fetching crews:', error);
+        toast("Error loading crews", {
+          description: "Please try again later.",
+        });
+      } finally {
+        setIsLoading(false);
       }
     };
-    
+
     fetchCrews();
-  };
+  }, [isConnected, address]);
+
+  // Handle search and filtering
+  useEffect(() => {
+    if (!searchQuery) {
+      setFilteredCrews(sortCrews(crews, sortBy));
+      return;
+    }
+    
+    const filtered = crews.filter((crew) => 
+      crew.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    
+    setFilteredCrews(sortCrews(filtered, sortBy));
+  }, [searchQuery, crews, sortBy]);
   
+  // Sort crews based on selected option
+  const sortCrews = (crewsToSort: Crew[], sortOption: SortOption) => {
+    switch (sortOption) {
+      case 'newest':
+        return [...crewsToSort].sort((a, b) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+      case 'most_members':
+        return [...crewsToSort].sort((a, b) => 
+          (b._count?.members || 0) - (a._count?.members || 0)
+        );
+      case 'most_mined':
+        return [...crewsToSort].sort((a, b) => 
+          (b._count?.total_mined || 0) - (a._count?.total_mined || 0)
+        );
+      default:
+        return crewsToSort;
+    }
+  };
+
+  const handleJoinCrew = async (crewId: string, crewName: string) => {
+    try {
+      if (!isConnected) {
+        connect();
+        return;
+      }
+      
+      if (userCrewId) {
+        toast("Already in a Crew", {
+          description: "You must leave your current crew before joining a new one.",
+        });
+        return;
+      }
+      
+      // First, get the user id from the wallet address
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('wallet_address', address!.toLowerCase())
+        .single();
+        
+      if (userError || !userData) {
+        // User doesn't exist yet, create one
+        const { data: newUser, error: createError } = await supabase
+          .from('users')
+          .insert({
+            wallet_address: address!.toLowerCase(),
+          })
+          .select('id')
+          .single();
+          
+        if (createError || !newUser) {
+          throw new Error('Failed to create user profile');
+        }
+        
+        const { error: joinError } = await supabase
+          .from('crew_members')
+          .insert({
+            user_id: newUser.id,
+            crew_id: crewId,
+          });
+          
+        if (joinError) throw joinError;
+
+        // Log the activity
+        await logActivity('join_crew', { crew_id: crewId, crew_name: crewName });
+      } else {
+        // User exists, add them to the crew
+        const { error: joinError } = await supabase
+          .from('crew_members')
+          .insert({
+            user_id: userData.id,
+            crew_id: crewId,
+          });
+          
+        if (joinError) throw joinError;
+        
+        // Log the activity
+        await logActivity('join_crew', { crew_id: crewId, crew_name: crewName });
+      }
+      
+      setUserCrewId(crewId);
+      toast("Crew Joined!", {
+        description: `You have successfully joined ${crewName}!`,
+      });
+    } catch (error) {
+      console.error('Error joining crew:', error);
+      toast("Join Failed", {
+        description: "Failed to join crew. Please try again.",
+      });
+    }
+  };
+
+  // Generate avatar fallback text from crew name
+  const getNameInitials = (name: string) => {
+    return name.split(' ')
+      .map((word) => word[0])
+      .join('')
+      .substring(0, 2)
+      .toUpperCase();
+  };
+
+  // Format number with commas
+  const formatNumber = (num: number) => {
+    return new Intl.NumberFormat().format(num);
+  };
+
   return (
     <Layout>
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-2">Crew Directory</h1>
-        <p className="text-corepulse-gray-600 mb-8">Join or create a crew to boost your mining power and earn rewards together</p>
-        
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="browse" disabled={loading}>Browse Crews</TabsTrigger>
-            <TabsTrigger value="my-crew" disabled={loading || !userCrew}>My Crew</TabsTrigger>
-            <TabsTrigger value="join" disabled={loading || !!userCrew}>Join Crew</TabsTrigger>
-            <TabsTrigger value="create" disabled={loading || !!userCrew}>Create Crew</TabsTrigger>
-          </TabsList>
+      <section className="container mx-auto px-4 py-8 max-w-6xl">
+        <div className="flex flex-col space-y-4">
+          <h1 className="text-3xl font-bold text-center mb-4">Crew Directory</h1>
+          <p className="text-center text-corepulse-gray-600 mb-8">
+            Join a crew to collaborate with other miners and earn bonus rewards!
+          </p>
           
-          <TabsContent value="browse" className="space-y-4">
-            {loading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {Array(6).fill(0).map((_, i) => (
-                  <Skeleton key={i} className="h-40" />
-                ))}
+          {/* Search and filters */}
+          <div className="flex flex-col md:flex-row gap-4 mb-6">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-corepulse-gray-500" />
+              <Input
+                type="text"
+                placeholder="Search crews..."
+                className="pl-10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-corepulse-gray-600">Sort by:</span>
+              <div className="relative">
+                <select
+                  className="appearance-none bg-white border border-corepulse-gray-300 rounded px-4 py-2 pr-8 text-corepulse-gray-700"
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortOption)}
+                >
+                  <option value="newest">Newest</option>
+                  <option value="most_members">Most Members</option>
+                  <option value="most_mined">Most Mined</option>
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-corepulse-gray-500 pointer-events-none" size={16} />
               </div>
-            ) : crews.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {crews.map(crew => (
-                  <Card key={crew.id} className="border-2 hover:border-corepulse-orange">
-                    <CardHeader>
-                      <CardTitle className="flex justify-between">
-                        <span>{crew.name}</span>
-                        <span className="text-sm text-corepulse-gray-600 font-normal">
-                          {crew.member_count} members
-                        </span>
-                      </CardTitle>
+            </div>
+          </div>
+          
+          {isLoading ? (
+            <div className="flex justify-center items-center h-60">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-corepulse-orange"></div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredCrews.length > 0 ? (
+                filteredCrews.map((crew) => (
+                  <Card key={crew.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center gap-4">
+                        <Avatar className="h-12 w-12 bg-corepulse-orange text-white">
+                          <AvatarImage src={`https://api.dicebear.com/7.x/shapes/svg?seed=${crew.id}`} alt={crew.name} />
+                          <AvatarFallback>{getNameInitials(crew.name)}</AvatarFallback>
+                        </Avatar>
+                        <CardTitle className="text-xl">{crew.name}</CardTitle>
+                      </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-corepulse-gray-600">Creator:</span>
-                          <span>{formatAddress(crew.creator_wallet || '')}</span>
+                      <div className="flex justify-between items-center text-sm text-corepulse-gray-600 mb-2">
+                        <div className="flex items-center gap-1">
+                          <Users size={16} />
+                          <span>{formatNumber(crew._count?.members || 0)} members</span>
                         </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-corepulse-gray-600">Total Mined:</span>
-                          <span className="font-medium">{crew.total_mined.toFixed(2)} $CORE</span>
+                        <div>
+                          <span className="font-medium">{formatNumber(crew._count?.total_mined || 0)} WAVES</span> mined
                         </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-corepulse-gray-600">Created:</span>
-                          <span>{new Date(crew.created_at).toLocaleDateString()}</span>
-                        </div>
-                        
-                        {!userCrew && (
-                          <Button
-                            className="w-full mt-2 bg-corepulse-orange hover:bg-corepulse-orange-hover"
-                            onClick={() => {
-                              if (!isConnected) {
-                                connect();
-                              } else {
-                                setActiveTab('join');
-                              }
-                            }}
-                          >
-                            Join Crew
-                          </Button>
-                        )}
+                      </div>
+                      <div className="h-2 bg-corepulse-gray-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-corepulse-orange transition-all duration-500"
+                          style={{ width: `${Math.min(100, ((crew._count?.members || 1) / 10) * 100)}%` }}
+                        ></div>
                       </div>
                     </CardContent>
+                    <CardFooter>
+                      {userCrewId === crew.id ? (
+                        <Button 
+                          className="w-full bg-corepulse-gray-200 hover:bg-corepulse-gray-300 text-corepulse-gray-800"
+                          disabled
+                        >
+                          Current Crew
+                        </Button>
+                      ) : (
+                        <Button 
+                          className="w-full bg-corepulse-orange hover:bg-corepulse-orange-hover text-white"
+                          onClick={() => handleJoinCrew(crew.id, crew.name)}
+                          disabled={!!userCrewId}
+                        >
+                          {!isConnected ? "Connect Wallet to Join" : 
+                            userCrewId ? "Already in a Crew" : "Join Crew"}
+                        </Button>
+                      )}
+                    </CardFooter>
                   </Card>
-                ))}
-              </div>
-            ) : (
-              <Card>
-                <CardContent className="py-8 text-center">
-                  <p className="text-corepulse-gray-600">No crews have been created yet.</p>
-                  <Button
-                    className="mt-4 bg-corepulse-orange hover:bg-corepulse-orange-hover"
-                    onClick={() => setActiveTab('create')}
+                ))
+              ) : (
+                <div className="col-span-full text-center p-12 bg-corepulse-gray-100 rounded-lg">
+                  <p className="text-corepulse-gray-600 mb-2">No crews found matching your search.</p>
+                  <Button 
+                    className="bg-corepulse-orange hover:bg-corepulse-orange-hover text-white"
+                    onClick={() => setSearchQuery('')}
                   >
-                    Create the First Crew
+                    Clear Search
                   </Button>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-          
-          <TabsContent value="my-crew">
-            {userCrew ? (
-              <div className="space-y-6">
-                <Card className="border-2">
-                  <CardHeader>
-                    <CardTitle className="flex justify-between items-center">
-                      <span>{userCrew.name}</span>
-                      <Button
-                        variant="outline"
-                        className="text-red-500 border-red-200 hover:bg-red-50"
-                        onClick={handleLeaveCrew}
-                        disabled={userCrew.creator_wallet === address?.toLowerCase()}
-                      >
-                        {userCrew.creator_wallet === address?.toLowerCase() ? 
-                          "Creator Cannot Leave" : "Leave Crew"}
-                      </Button>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                      <div className="bg-corepulse-gray-100 p-4 rounded text-center">
-                        <p className="text-corepulse-gray-600 text-sm mb-1">Members</p>
-                        <p className="text-2xl font-bold">{userCrew.member_count}</p>
-                      </div>
-                      <div className="bg-corepulse-gray-100 p-4 rounded text-center">
-                        <p className="text-corepulse-gray-600 text-sm mb-1">Total Mined</p>
-                        <p className="text-2xl font-bold">{userCrew.total_mined.toFixed(2)} $CORE</p>
-                      </div>
-                      <div className="bg-corepulse-gray-100 p-4 rounded text-center">
-                        <p className="text-corepulse-gray-600 text-sm mb-1">Created</p>
-                        <p className="text-2xl font-bold">{new Date(userCrew.created_at).toLocaleDateString()}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="mt-6">
-                      <h3 className="text-lg font-semibold mb-3">Members</h3>
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead className="bg-corepulse-gray-100">
-                            <tr>
-                              <th className="p-2 text-left">Wallet</th>
-                              <th className="p-2 text-right">Mined</th>
-                              <th className="p-2 text-right">Joined</th>
-                              <th className="p-2 text-center">Role</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {userCrew.members.map(member => (
-                              <tr key={member.user_id} className="border-b">
-                                <td className="p-2">
-                                  {formatAddress(member.wallet_address)}
-                                  {member.wallet_address.toLowerCase() === address?.toLowerCase() && (
-                                    <span className="ml-2 text-corepulse-orange">(You)</span>
-                                  )}
-                                </td>
-                                <td className="p-2 text-right">{member.total_mined.toFixed(2)}</td>
-                                <td className="p-2 text-right">
-                                  {new Date(member.joined_at).toLocaleDateString()}
-                                </td>
-                                <td className="p-2 text-center">
-                                  {member.wallet_address === userCrew.creator_wallet ? "Creator" : "Member"}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                    
-                    <div className="mt-6 border-t pt-4">
-                      <h3 className="text-lg font-semibold mb-3">Crew ID</h3>
-                      <p className="text-corepulse-gray-600 mb-2">Share this ID with friends to invite them to your crew</p>
-                      <Card>
-                        <CardContent className="p-3 text-center">
-                          <code className="bg-corepulse-gray-100 p-2 rounded font-mono">
-                            {userCrew.id}
-                          </code>
-                        </CardContent>
-                      </Card>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            ) : (
-              <Card>
-                <CardContent className="py-8 text-center">
-                  <p className="text-corepulse-gray-600">You are not a member of any crew.</p>
-                  <div className="flex justify-center mt-4 space-x-4">
-                    <Button
-                      className="bg-corepulse-orange hover:bg-corepulse-orange-hover"
-                      onClick={() => setActiveTab('join')}
-                    >
-                      Join a Crew
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => setActiveTab('create')}
-                    >
-                      Create a Crew
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-          
-          <TabsContent value="join">
-            {!isConnected ? (
-              <Card>
-                <CardContent className="py-8 text-center">
-                  <p className="text-corepulse-gray-600 mb-4">Connect your wallet to join a crew</p>
-                  <Button
-                    className="bg-corepulse-orange hover:bg-corepulse-orange-hover"
-                    onClick={connect}
-                  >
-                    Connect Wallet
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : userCrew ? (
-              <Card>
-                <CardContent className="py-8 text-center">
-                  <p className="text-corepulse-gray-600">You are already a member of a crew.</p>
-                  <Button
-                    className="mt-4 bg-corepulse-orange hover:bg-corepulse-orange-hover"
-                    onClick={() => setActiveTab('my-crew')}
-                  >
-                    View My Crew
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Join a Crew</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <JoinCrewForm onSuccess={handleCrewSuccess} />
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-          
-          <TabsContent value="create">
-            {!isConnected ? (
-              <Card>
-                <CardContent className="py-8 text-center">
-                  <p className="text-corepulse-gray-600 mb-4">Connect your wallet to create a crew</p>
-                  <Button
-                    className="bg-corepulse-orange hover:bg-corepulse-orange-hover"
-                    onClick={connect}
-                  >
-                    Connect Wallet
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : userCrew ? (
-              <Card>
-                <CardContent className="py-8 text-center">
-                  <p className="text-corepulse-gray-600">You are already a member of a crew.</p>
-                  <Button
-                    className="mt-4 bg-corepulse-orange hover:bg-corepulse-orange-hover"
-                    onClick={() => setActiveTab('my-crew')}
-                  >
-                    View My Crew
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Create a New Crew</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <CreateCrewForm onSuccess={handleCrewSuccess} />
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-        </Tabs>
-      </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
     </Layout>
   );
 };

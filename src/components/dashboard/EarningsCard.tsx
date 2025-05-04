@@ -3,32 +3,62 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Skeleton } from "@/components/ui/skeleton";
-import { useEarningsData } from '@/hooks/useEarningsData';
 
 const EarningsCard = () => {
   const [tab, setTab] = useState("daily");
-  const { earningsData, loading } = useEarningsData();
   
-  // Get the appropriate data based on the selected tab
+  // Sample data for the charts
+  const dailyData = [
+    { name: '00:00', value: 15 },
+    { name: '04:00', value: 25 },
+    { name: '08:00', value: 40 },
+    { name: '12:00', value: 30 },
+    { name: '16:00', value: 55 },
+    { name: '20:00', value: 70 },
+    { name: '23:59', value: 60 }
+  ];
+  
+  const weeklyData = [
+    { name: 'Mon', value: 150 },
+    { name: 'Tue', value: 230 },
+    { name: 'Wed', value: 180 },
+    { name: 'Thu', value: 290 },
+    { name: 'Fri', value: 320 },
+    { name: 'Sat', value: 210 },
+    { name: 'Sun', value: 250 }
+  ];
+  
+  const monthlyData = [
+    { name: 'Week 1', value: 1200 },
+    { name: 'Week 2', value: 1400 },
+    { name: 'Week 3', value: 1800 },
+    { name: 'Week 4', value: 1600 }
+  ];
+  
+  // Get the appropriate data and total based on the selected tab
   const getTabData = () => {
     switch (tab) {
       case 'daily':
-        return earningsData.daily;
+        return { 
+          data: dailyData, 
+          total: dailyData.reduce((sum, item) => sum + item.value, 0) / 10
+        };
       case 'weekly':
-        return earningsData.weekly;
+        return { 
+          data: weeklyData, 
+          total: weeklyData.reduce((sum, item) => sum + item.value, 0) / 10
+        };
       case 'monthly':
-        return earningsData.monthly;
+        return { 
+          data: monthlyData, 
+          total: monthlyData.reduce((sum, item) => sum + item.value, 0) / 10
+        };
       default:
-        return earningsData.daily;
+        return { data: dailyData, total: 0 };
     }
   };
   
-  // Calculate total for current view
-  const calculateTotal = () => {
-    const data = getTabData();
-    return data.reduce((sum, item) => sum + item.value, 0);
-  };
+  const { data, total } = getTabData();
   
   return (
     <Card className="border-2 h-full">
@@ -41,27 +71,15 @@ const EarningsCard = () => {
               <TabsTrigger value="weekly">Weekly</TabsTrigger>
               <TabsTrigger value="monthly">Monthly</TabsTrigger>
             </TabsList>
-            {loading ? (
-              <div className="mt-4">
-                <Skeleton className="h-64 w-full" />
-                <div className="mt-4 text-center">
-                  <Skeleton className="h-4 w-1/3 mx-auto mb-2" />
-                  <Skeleton className="h-6 w-1/4 mx-auto" />
-                </div>
-              </div>
-            ) : (
-              <>
-                <TabsContent value="daily">
-                  <ChartContent data={earningsData.daily} total={calculateTotal()} period="daily" />
-                </TabsContent>
-                <TabsContent value="weekly">
-                  <ChartContent data={earningsData.weekly} total={calculateTotal()} period="weekly" />
-                </TabsContent>
-                <TabsContent value="monthly">
-                  <ChartContent data={earningsData.monthly} total={calculateTotal()} period="monthly" />
-                </TabsContent>
-              </>
-            )}
+            <TabsContent value="daily">
+              <ChartContent data={data} total={total} period="daily" />
+            </TabsContent>
+            <TabsContent value="weekly">
+              <ChartContent data={data} total={total} period="weekly" />
+            </TabsContent>
+            <TabsContent value="monthly">
+              <ChartContent data={data} total={total} period="monthly" />
+            </TabsContent>
           </Tabs>
         </div>
       </CardHeader>
