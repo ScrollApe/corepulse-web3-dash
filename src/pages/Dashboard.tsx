@@ -12,6 +12,21 @@ import AvatarCard from '@/components/dashboard/AvatarCard';
 import ActivityFeed from '@/components/dashboard/ActivityFeed';
 
 const Dashboard = () => {
+  // Using static mock data since we removed database implementation
+  const mockData = {
+    activeBoost: 15,
+    nftCount: 2,
+    currentStreak: 5,
+    bestStreak: 12,
+    level: 7,
+    experience: 350,
+    nextLevelExp: 500,
+    avatarImage: "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix",
+    daysLeft: 5,
+    hoursLeft: 12,
+    progress: 65
+  };
+
   return (
     <Layout>
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -25,12 +40,12 @@ const Dashboard = () => {
           
           {/* NFT Boost panel */}
           <div>
-            <NFTBoostCard activeBoost={15} nftCount={2} />
+            <NFTBoostCard activeBoost={mockData.activeBoost} nftCount={mockData.nftCount} />
           </div>
           
           {/* Daily Streak */}
           <div>
-            <StreakCard currentStreak={5} bestStreak={12} />
+            <StreakCard currentStreak={mockData.currentStreak} bestStreak={mockData.bestStreak} />
           </div>
           
           {/* Earnings Summary - takes more space */}
@@ -41,10 +56,10 @@ const Dashboard = () => {
           {/* Avatar Evolution */}
           <div className="lg:row-span-2">
             <AvatarCard 
-              level={7} 
-              experience={350} 
-              nextLevelExp={500} 
-              avatarImage="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" 
+              level={mockData.level} 
+              experience={mockData.experience} 
+              nextLevelExp={mockData.nextLevelExp} 
+              avatarImage={mockData.avatarImage} 
             />
           </div>
           
@@ -60,7 +75,11 @@ const Dashboard = () => {
           
           {/* Epoch Countdown */}
           <div>
-            <EpochCard daysLeft={5} hoursLeft={12} progress={65} />
+            <EpochCard 
+              daysLeft={mockData.daysLeft} 
+              hoursLeft={mockData.hoursLeft} 
+              progress={mockData.progress} 
+            />
           </div>
           
           {/* Community Activity Feed */}

@@ -1,6 +1,5 @@
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAccount } from 'wagmi';
 
 interface Activity {
@@ -23,65 +22,40 @@ export const useActivitiesFeed = ({ limit = 20, global = false }: UseActivitiesF
   const { address } = useAccount();
 
   useEffect(() => {
-    const fetchActivities = async () => {
-      try {
-        setLoading(true);
-        
-        let query = supabase
-          .from('user_activities')
-          .select('*, users:user_id(wallet_address)')
-          .order('created_at', { ascending: false })
-          .limit(limit);
-        
-        if (!global && address) {
-          // Filter for user's own activities if not global feed
-          const { data: userData } = await supabase
-            .from('users')
-            .select('id')
-            .eq('wallet_address', address.toLowerCase())
-            .single();
-            
-          if (userData) {
-            query = query.eq('user_id', userData.id);
-          }
-        }
-        
-        const { data, error: activitiesError } = await query;
-        
-        if (activitiesError) {
-          throw activitiesError;
-        }
-        
-        setActivities(data as Activity[]);
-      } catch (err) {
-        console.error('Error fetching activities:', err);
-        setError(err as Error);
-      } finally {
-        setLoading(false);
-      }
-    };
+    // Simulate loading
+    setLoading(true);
     
-    fetchActivities();
-    
-    // Set up real-time listener
-    const channel = supabase
-      .channel('schema-db-changes')
-      .on(
-        'postgres_changes',
+    // Create mock activities since we're removing database implementation
+    setTimeout(() => {
+      const mockActivities: Activity[] = [
         {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'user_activities',
+          id: '1',
+          activity: 'wallet_connect',
+          created_at: new Date().toISOString(),
+          metadata: {},
+          user_id: '1'
         },
-        (payload) => {
-          setActivities((prev) => [payload.new as Activity, ...prev].slice(0, limit));
+        {
+          id: '2',
+          activity: 'start_mining',
+          created_at: new Date(Date.now() - 10 * 60000).toISOString(),
+          metadata: { rate: 0.0012 },
+          user_id: '1'
+        },
+        {
+          id: '3',
+          activity: 'stop_mining',
+          created_at: new Date(Date.now() - 5 * 60000).toISOString(),
+          metadata: { earned: '0.006', duration: 5 },
+          user_id: '1'
         }
-      )
-      .subscribe();
-    
-    return () => {
-      supabase.removeChannel(channel);
-    };
+      ];
+
+      setActivities(mockActivities);
+      setLoading(false);
+    }, 500);
+
+    // No cleanup needed for mock data
   }, [global, limit, address]);
   
   return { activities, loading, error };

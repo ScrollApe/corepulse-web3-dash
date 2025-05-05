@@ -1,14 +1,12 @@
 
 import React, { createContext, useContext, ReactNode } from 'react';
 import { useAccount } from 'wagmi';
-import { v4 as uuidv4 } from 'uuid';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/sonner';
 
 export type ActivityType = 'wallet_connect' | 'start_mining' | 'stop_mining' | 'join_crew' | 'leave_crew' | 'mint_nft' | 'claim_reward';
 
 interface ActivityContextType {
-  logActivity: (activity: ActivityType, metadata?: Record<string, any>) => Promise<void>;
+  logActivity: (activity: ActivityType, metadata?: Record<string, any>) => void;
 }
 
 const ActivityContext = createContext<ActivityContextType | undefined>(undefined);
@@ -28,44 +26,28 @@ interface ActivityProviderProps {
 export const ActivityProvider = ({ children }: ActivityProviderProps) => {
   const { address, isConnected } = useAccount();
 
-  const logActivity = async (activity: ActivityType, metadata: Record<string, any> = {}) => {
+  const logActivity = (activity: ActivityType, metadata: Record<string, any> = {}) => {
     if (!isConnected || !address) {
       console.warn('Cannot log activity: wallet not connected');
       return;
     }
 
-    try {
-      // Get user id from wallet address
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('wallet_address', address.toLowerCase())
-        .single();
-
-      if (userError || !userData) {
-        console.error('Error fetching user id:', userError);
-        return;
-      }
-
-      const userId = userData.id;
-
-      // Record activity
-      const { error } = await supabase
-        .from('user_activities')
-        .insert({
-          user_id: userId,
-          activity,
-          metadata,
-        });
-
-      if (error) {
-        console.error('Error logging activity:', error);
-        toast("Failed to log activity", {
-          description: "There was an error recording your activity.",
-        });
-      }
-    } catch (error) {
-      console.error('Error in logActivity:', error);
+    // Just log to console instead of database
+    console.log(`Activity logged: ${activity}`, metadata);
+    
+    // Show toast for important activities
+    if (activity === 'wallet_connect') {
+      toast("Wallet Connected", {
+        description: "Your wallet has been successfully connected.",
+      });
+    } else if (activity === 'start_mining') {
+      toast("Mining Started", {
+        description: "You've started mining.",
+      });
+    } else if (activity === 'stop_mining') {
+      toast("Mining Stopped", {
+        description: `Mining session ended.`,
+      });
     }
   };
 

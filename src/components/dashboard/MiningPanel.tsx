@@ -5,7 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import PulseWave from '@/components/ui/PulseWave';
 import { useAccount } from 'wagmi';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/sonner';
 import { useWalletConnect } from '@/providers/WalletProvider';
 import { useActivity } from '@/providers/ActivityProvider';
@@ -21,141 +20,22 @@ const MiningPanel = () => {
     maxMinutes: 240, // 4 hours default
     remaining: 240,
   });
-  const [userId, setUserId] = useState<string | null>(null);
   const [userVerified, setUserVerified] = useState(false);
   
   const { isConnected, address } = useAccount();
   const { connect } = useWalletConnect();
   const { logActivity } = useActivity();
   
-  // Fetch user ID when wallet is connected
+  // Update user verification status when wallet is connected
   useEffect(() => {
-    const fetchUserId = async () => {
-      if (!isConnected || !address) {
-        setUserId(null);
-        setUserVerified(false);
-        return;
-      }
-      
-      try {
-        setIsLoading(true);
-        console.log("Checking database for wallet address:", address.toLowerCase());
-        
-        const { data, error } = await supabase
-          .from('users')
-          .select('id')
-          .eq('wallet_address', address.toLowerCase())
-          .maybeSingle();
-          
-        if (error) {
-          console.error('Error fetching user:', error);
-          toast('Error', {
-            description: 'Could not verify your wallet. Please try reconnecting.'
-          });
-          setUserVerified(false);
-          return;
-        }
-        
-        if (data) {
-          console.log('User verified with ID:', data.id);
-          setUserId(data.id);
-          setUserVerified(true);
-        } else {
-          console.error('No user found for wallet address:', address);
-          toast('Wallet Not Registered', {
-            description: 'Please reconnect your wallet to register it.'
-          });
-          setUserVerified(false);
-        }
-      } catch (error) {
-        console.error('Error in fetchUserId:', error);
-        setUserVerified(false);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchUserId();
-  }, [isConnected, address]);
-  
-  // Fetch daily limits when user ID is available
-  useEffect(() => {
-    const fetchDailyLimits = async () => {
-      if (!userId) return;
-      
-      try {
-        const today = new Date().toISOString().split('T')[0];
-        
-        // Check if entry exists for today
-        const { data: limitData, error: limitError } = await supabase
-          .from('daily_mining_limits')
-          .select('*')
-          .eq('user_id', userId)
-          .eq('date', today)
-          .single();
-          
-        if (limitError && limitError.code !== 'PGRST116') { // PGRST116 is "No rows returned" error
-          console.error('Error fetching daily limits:', limitError);
-          return;
-        }
-        
-        if (limitData) {
-          setDailyLimits({
-            minutesUsed: limitData.minutes_mined,
-            maxMinutes: limitData.max_minutes,
-            remaining: limitData.max_minutes - limitData.minutes_mined,
-          });
-        } else {
-          // Create a new entry for today
-          const { error: insertError } = await supabase
-            .from('daily_mining_limits')
-            .insert({
-              user_id: userId,
-              date: today,
-              minutes_mined: 0,
-              max_minutes: 240, // 4 hours default
-            });
-            
-          if (insertError) {
-            console.error('Error creating daily limit:', insertError);
-          }
-        }
-      } catch (error) {
-        console.error('Error in fetchDailyLimits:', error);
-      }
-    };
-    
-    fetchDailyLimits();
-    
-    // Set up realtime subscription
-    if (userId) {
-      const channel = supabase
-        .channel('daily-limits-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'daily_mining_limits',
-          },
-          (payload) => {
-            if (payload.new) {
-              const newData = payload.new as any;
-              setDailyLimits({
-                minutesUsed: newData.minutes_mined,
-                maxMinutes: newData.max_minutes,
-                remaining: newData.max_minutes - newData.minutes_mined,
-              });
-            }
-          }
-        )
-        .subscribe();
-        
-      return () => {
-        supabase.removeChannel(channel);
-      };
+    if (isConnected && address) {
+      console.log("Wallet connected:", address);
+      // Simply verify the user is connected, no database check
+      setUserVerified(true);
+    } else {
+      setUserVerified(false);
     }
-  }, [userId]);
+  }, [isConnected, address]);
 
   // Handle mining calculation
   useEffect(() => {
@@ -175,16 +55,16 @@ const MiningPanel = () => {
     };
   }, [isMining, rate]);
 
-  // Record mining session
+  // Start mining session without database interaction
   const startMiningSession = async () => {
     if (!isConnected || !address) {
       connect();
       return;
     }
     
-    if (!userVerified || !userId) {
+    if (!userVerified) {
       toast("Wallet Authentication Required", {
-        description: "Please reconnect your wallet to verify your account.",
+        description: "Please connect your wallet to start mining.",
       });
       return;
     }
@@ -192,22 +72,7 @@ const MiningPanel = () => {
     try {
       setIsLoading(true);
       
-      // Double-check user exists
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('id', userId)
-        .single();
-        
-      if (userError || !userData) {
-        console.error('Error verifying user:', userError);
-        toast("Authentication Error", {
-          description: "Could not verify your account. Please reconnect your wallet.",
-        });
-        return;
-      }
-      
-      // Check daily limits
+      // Check local daily limits
       if (dailyLimits.remaining <= 0) {
         toast("Daily Limit Reached", {
           description: "You've reached your daily mining limit. Come back tomorrow!",
@@ -215,31 +80,11 @@ const MiningPanel = () => {
         return;
       }
       
-      // Create new mining session
-      const { data: sessionData, error: sessionError } = await supabase
-        .from('mining_sessions')
-        .insert({
-          user_id: userId,
-          base_rate: rate,
-          nft_boost_percent: 0, // Assuming this will be calculated separately
-          referral_bonus_percent: 0, // Assuming this will be calculated separately
-        })
-        .select()
-        .single();
-        
-      if (sessionError) {
-        console.error('Error creating mining session:', sessionError);
-        toast("Error Starting Mining", {
-          description: "Failed to start mining session.",
-        });
-        return;
-      }
-      
       setSessionStartTime(new Date());
       setIsMining(true);
       
-      // Log activity
-      await logActivity('start_mining', { session_id: sessionData.id });
+      // Log activity (in memory only)
+      logActivity('start_mining', { timestamp: new Date().toISOString() });
       
       toast("Mining Started", {
         description: "Your mining session has begun!",
@@ -256,92 +101,27 @@ const MiningPanel = () => {
   };
 
   const stopMiningSession = async () => {
-    if (!userId || !sessionStartTime) return;
+    if (!sessionStartTime) return;
     
     try {
       setIsLoading(true);
-      
-      // Get latest mining session
-      const { data: sessionData, error: sessionError } = await supabase
-        .from('mining_sessions')
-        .select('*')
-        .eq('user_id', userId)
-        .is('end_time', null)
-        .order('start_time', { ascending: false })
-        .limit(1)
-        .single();
-        
-      if (sessionError) {
-        console.error('Error fetching mining session:', sessionError);
-        return;
-      }
       
       const now = new Date();
       const durationMs = now.getTime() - sessionStartTime.getTime();
       const durationMinutes = Math.max(1, Math.round(durationMs / 60000));
       
-      // Update mining session
-      const { error: updateError } = await supabase
-        .from('mining_sessions')
-        .update({
-          end_time: now.toISOString(),
-          earned_amount: earned,
-        })
-        .eq('id', sessionData.id);
-        
-      if (updateError) {
-        console.error('Error updating mining session:', updateError);
-        return;
-      }
-        
-      // Update user's total mined amount - Using proper typing
-      // First call the RPC function to get the new value
-      const { data: newTotalMined, error: rpcError } = await supabase.rpc('increment', { x: earned });
+      // Update local limits (no database)
+      setDailyLimits(prev => {
+        const newMinutesUsed = prev.minutesUsed + durationMinutes;
+        return {
+          ...prev,
+          minutesUsed: newMinutesUsed,
+          remaining: Math.max(0, prev.maxMinutes - newMinutesUsed)
+        };
+      });
       
-      if (rpcError) {
-        console.error('Error calculating new total mined:', rpcError);
-        return;
-      }
-      
-      // Then update the user with the returned value
-      const updateUserResult = await supabase
-        .from('users')
-        .update({
-          total_mined: newTotalMined,
-        })
-        .eq('id', userId);
-        
-      if (updateUserResult.error) {
-        console.error('Error updating user total mined:', updateUserResult.error);
-      }
-        
-      // Update daily limits - Using proper typing
-      const today = now.toISOString().split('T')[0];
-      
-      // First call the RPC function to get the new minutes value
-      const { data: newMinutes, error: minutesRpcError } = await supabase.rpc('increment', { x: durationMinutes });
-      
-      if (minutesRpcError) {
-        console.error('Error calculating new minutes:', minutesRpcError);
-        return;
-      }
-      
-      const updateLimitResult = await supabase
-        .from('daily_mining_limits')
-        .update({
-          minutes_mined: newMinutes,
-          last_mining_session_id: sessionData.id,
-        })
-        .eq('user_id', userId)
-        .eq('date', today);
-        
-      if (updateLimitResult.error) {
-        console.error('Error updating daily limits:', updateLimitResult.error);
-      }
-        
       // Log activity
-      await logActivity('stop_mining', { 
-        session_id: sessionData.id,
+      logActivity('stop_mining', { 
         duration: durationMinutes,
         earned: earned.toFixed(6)
       });
