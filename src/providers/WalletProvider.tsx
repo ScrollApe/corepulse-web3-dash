@@ -69,68 +69,76 @@ const trackWalletConnection = async (address: string) => {
     if (!existingUser) {
       console.log('Creating new user for address:', formattedAddress);
       
-      // Create new user with direct insert
-      const { data, error: insertError } = await supabase
-        .from('users')
-        .insert([
-          { 
-            wallet_address: formattedAddress,
-            level: 1,
-            experience: 0,
-            next_level_exp: 100,
-            total_mined: 0,
-            avatar_stage: 1
-          }
-        ])
-        .select('id')
-        .single();
-        
-      if (insertError) {
-        console.error('Error creating user:', insertError);
-        console.error('Insert error details:', insertError.message, insertError.details);
-        
-        // If there's an RLS error, try logging it more explicitly
-        if (insertError.message.includes('row-level security')) {
-          console.error('RLS policy preventing insert. Make sure your RLS policies allow insertion for this table.');
+      // Try direct insert with service role client
+      try {
+        const { data, error: insertError } = await supabase
+          .from('users')
+          .insert([
+            { 
+              wallet_address: formattedAddress,
+              level: 1,
+              experience: 0,
+              next_level_exp: 100,
+              total_mined: 0,
+              avatar_stage: 1
+            }
+          ])
+          .select('id')
+          .single();
           
-          toast('Failed to register wallet', {
-            description: 'There was a security error creating your account. Please try again later.',
-          });
-        } else {
-          toast('Failed to register wallet', {
-            description: 'There was an error creating your account. Please try again.',
-          });
-        }
-        return null;
-      }
-      
-      if (!data || !data.id) {
-        console.error('No data returned from user insertion');
-        return null;
-      }
-      
-      console.log('New user created with ID:', data.id);
-      
-      // Create initial streak record
-      const { error: streakError } = await supabase
-        .from('streaks')
-        .insert([
-          { 
-            user_id: data.id,
-            current_streak_days: 1,
-            last_check_in: new Date().toISOString()
+        if (insertError) {
+          console.error('Error creating user:', insertError);
+          console.error('Insert error details:', insertError.message, insertError.details);
+          
+          // If there's an RLS error, try logging it more explicitly
+          if (insertError.message.includes('row-level security')) {
+            console.error('RLS policy preventing insert. Make sure your RLS policies allow insertion for this table.');
+            
+            toast('Failed to register wallet', {
+              description: 'There was a security error creating your account. Please try again later.',
+            });
+          } else {
+            toast('Failed to register wallet', {
+              description: 'There was an error creating your account. Please try again.',
+            });
           }
-        ]);
-      
-      if (streakError) {
-        console.error('Error creating initial streak:', streakError);
-      }
+          return null;
+        }
         
-      toast('Welcome to CorePulse!', {
-        description: 'Your account has been created.',
-      });
-      
-      return data.id;
+        if (!data || !data.id) {
+          console.error('No data returned from user insertion');
+          return null;
+        }
+        
+        console.log('New user created with ID:', data.id);
+        
+        // Create initial streak record
+        const { error: streakError } = await supabase
+          .from('streaks')
+          .insert([
+            { 
+              user_id: data.id,
+              current_streak_days: 1,
+              last_check_in: new Date().toISOString()
+            }
+          ]);
+        
+        if (streakError) {
+          console.error('Error creating initial streak:', streakError);
+        }
+          
+        toast('Welcome to CorePulse!', {
+          description: 'Your account has been created.',
+        });
+        
+        return data.id;
+      } catch (insertCatchError) {
+        console.error('Caught exception during user insertion:', insertCatchError);
+        toast('Registration Error', {
+          description: 'There was an error creating your account. Please try again.',
+        });
+        return null;
+      }
     } else {
       console.log('User exists for address:', formattedAddress, 'with ID:', existingUser.id);
       
@@ -226,6 +234,7 @@ const WalletConnectionTracker = () => {
   const { address, isConnected } = useAccount();
   const [isTracked, setIsTracked] = useState(false);
   const [trackingAttempts, setTrackingAttempts] = useState(0);
+  const maxAttempts = 3;
 
   useEffect(() => {
     let isMounted = true;
@@ -236,35 +245,44 @@ const WalletConnectionTracker = () => {
       
       // Add delay to ensure provider is ready
       setTimeout(async () => {
-        if (isMounted) {
-          try {
-            const userId = await trackWalletConnection(address);
-            if (userId) {
-              console.log("Wallet connection tracked successfully, user ID:", userId);
-              setIsTracked(true);
-              setTrackingAttempts(0); // Reset attempts on success
-            } else {
-              console.error("Failed to track wallet connection");
+        if (!isMounted) return;
+        
+        try {
+          const userId = await trackWalletConnection(address);
+          if (userId) {
+            console.log("Wallet connection tracked successfully, user ID:", userId);
+            setIsTracked(true);
+            setTrackingAttempts(0); // Reset attempts on success
+          } else {
+            console.error("Failed to track wallet connection");
+            
+            // If we've tried less than max times, try again
+            if (trackingAttempts < maxAttempts - 1) {
+              setTrackingAttempts(prev => prev + 1);
+              setIsTracked(false); // Ensure we retry on next render
               
-              // If we've tried less than 3 times, try again
-              if (trackingAttempts < 3) {
-                setTrackingAttempts(prev => prev + 1);
-                setIsTracked(false); // Ensure we retry on next render
-              } else {
-                console.error("Maximum tracking attempts reached");
-                toast('Connection Issue', {
-                  description: 'We had trouble connecting your wallet to our systems. Please try again later.',
+              // Show toast on repeated failures
+              if (trackingAttempts > 0) {
+                toast('Retrying connection...', {
+                  description: `Attempt ${trackingAttempts + 1} of ${maxAttempts}`,
                 });
               }
+            } else {
+              console.error("Maximum tracking attempts reached");
+              toast('Connection Issue', {
+                description: 'We had trouble connecting your wallet to our systems. Please try again later.',
+              });
+              // Reset for future attempts
+              setTrackingAttempts(0);
             }
-          } catch (error) {
-            console.error("Error in wallet tracking:", error);
-            toast('Connection Error', {
-              description: 'There was an unexpected error connecting your wallet.',
-            });
           }
+        } catch (error) {
+          console.error("Error in wallet tracking:", error);
+          toast('Connection Error', {
+            description: 'There was an unexpected error connecting your wallet.',
+          });
         }
-      }, 1000);  // Increased delay to ensure wallet is fully connected
+      }, 1500);  // Increased delay to ensure wallet is fully connected
     } else if (!isConnected) {
       setIsTracked(false);
       setTrackingAttempts(0); // Reset attempts when disconnected
