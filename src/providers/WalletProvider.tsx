@@ -73,7 +73,14 @@ const trackWalletConnection = async (address: string) => {
       const { data, error: insertError } = await supabase
         .from('users')
         .insert([
-          { wallet_address: formattedAddress }
+          { 
+            wallet_address: formattedAddress,
+            level: 1,
+            experience: 0,
+            next_level_exp: 100,
+            total_mined: 0,
+            avatar_stage: 1
+          }
         ])
         .select('id')
         .single();
@@ -108,7 +115,11 @@ const trackWalletConnection = async (address: string) => {
       const { error: streakError } = await supabase
         .from('streaks')
         .insert([
-          { user_id: data.id }
+          { 
+            user_id: data.id,
+            current_streak_days: 1,
+            last_check_in: new Date().toISOString()
+          }
         ]);
       
       if (streakError) {

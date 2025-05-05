@@ -16,6 +16,7 @@ export const supabase = createClient<Database>(
     auth: {
       persistSession: true,
       autoRefreshToken: true,
+      storage: localStorage,
     },
     global: {
       headers: {
@@ -35,8 +36,10 @@ export const enableDebugMode = () => {
   supabase.from('users').select('count').then(result => {
     if (result.error) {
       console.error('Supabase Connection Error:', result.error);
+      console.error('Error details:', result.error.message);
     } else {
       console.log('Supabase Connection Successful');
+      console.log('Users count:', result.data);
     }
   });
 };
