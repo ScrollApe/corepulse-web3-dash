@@ -19,7 +19,7 @@ const Mint = () => {
     {
       tier: 'Bronze',
       boost: '5%',
-      price: '100 $CORE',
+      price: '100 $WAVES',
       image: 'https://api.dicebear.com/7.x/identicon/svg?seed=bronze',
       minted: 387,
       totalSupply: 1000
@@ -27,7 +27,7 @@ const Mint = () => {
     {
       tier: 'Silver',
       boost: '10%',
-      price: '250 $CORE',
+      price: '250 $WAVES',
       image: 'https://api.dicebear.com/7.x/identicon/svg?seed=silver',
       minted: 162,
       totalSupply: 500
@@ -35,7 +35,7 @@ const Mint = () => {
     {
       tier: 'Gold',
       boost: '20%',
-      price: '500 $CORE',
+      price: '500 $WAVES',
       image: 'https://api.dicebear.com/7.x/identicon/svg?seed=gold',
       minted: 58,
       totalSupply: 100
@@ -96,8 +96,8 @@ const Mint = () => {
             )}
             <Badge className="bg-corepulse-orange hover:bg-corepulse-orange-hover text-white">
               {isConnected 
-                ? `Wallet: ${formatAddress(address)} | Balance: 1,245 $CORE` 
-                : "Wallet Balance: 0 $CORE"}
+                ? `Wallet: ${formatAddress(address)} | Balance: 1,245 $WAVES` 
+                : "Wallet Balance: 0 $WAVES"}
             </Badge>
           </div>
         </div>

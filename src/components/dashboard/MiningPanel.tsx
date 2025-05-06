@@ -168,13 +168,13 @@ const MiningPanel = () => {
       
       <CardHeader className="relative z-10">
         <CardTitle>Mining Control</CardTitle>
-        <CardDescription>Start mining to earn $CORE tokens</CardDescription>
+        <CardDescription>Start mining to earn $WAVES tokens</CardDescription>
       </CardHeader>
       <CardContent className="relative z-10">
         <div className="flex flex-col items-center space-y-6">
           <div className="text-center">
             <p className="text-sm text-corepulse-gray-600">Current Mining Rate</p>
-            <p className="text-3xl font-bold">{rate.toFixed(4)} $CORE/min</p>
+            <p className="text-3xl font-bold">{rate.toFixed(4)} $WAVES/min</p>
           </div>
           
           {!isConnected ? (
@@ -216,7 +216,7 @@ const MiningPanel = () => {
           
           <div className="text-center">
             <p className="text-sm text-corepulse-gray-600">Earned this session</p>
-            <p className="text-3xl font-bold">{earned.toFixed(6)} $CORE</p>
+            <p className="text-3xl font-bold">{earned.toFixed(6)} $WAVES</p>
           </div>
           
           {isConnected && userVerified && (

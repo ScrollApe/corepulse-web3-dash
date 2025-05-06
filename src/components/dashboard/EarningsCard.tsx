@@ -122,7 +122,7 @@ const ChartContent: React.FC<ChartContentProps> = ({ data, total, period }) => {
       </div>
       <div className="mt-4 text-center">
         <p className="text-sm text-corepulse-gray-600">Total {period} earnings</p>
-        <p className="text-2xl font-bold">{total.toFixed(2)} $CORE</p>
+        <p className="text-2xl font-bold">{total.toFixed(2)} $WAVES</p>
       </div>
     </CardContent>
   );

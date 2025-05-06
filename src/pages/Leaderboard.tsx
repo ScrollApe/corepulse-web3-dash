@@ -45,7 +45,7 @@ const Leaderboard = () => {
   const minutesLeft = 43;
 
   const handleShareOnX = () => {
-    const text = `Check out my mining position on CorePulse! Currently ranked ${currentEpochLeaderboard.find(user => user.isCurrent)?.rank} with ${currentEpochLeaderboard.find(user => user.isCurrent)?.mined} CP mined this epoch!`;
+    const text = `Check out my mining position on CorePulse! Currently ranked ${currentEpochLeaderboard.find(user => user.isCurrent)?.rank} with ${currentEpochLeaderboard.find(user => user.isCurrent)?.mined} WAVES mined this epoch!`;
     const url = window.location.href;
     window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank');
   };
@@ -168,7 +168,7 @@ const LeaderboardTable = ({ data }: LeaderboardTableProps) => {
                 </TableCell>
                 <TableCell className="text-right">
                   <span className="font-mono font-medium">{user.mined.toLocaleString()}</span>
-                  <span className="text-xs ml-1 text-corepulse-gray-500">CP</span>
+                  <span className="text-xs ml-1 text-corepulse-gray-500">WAVES</span>
                 </TableCell>
               </TableRow>
             ))}
