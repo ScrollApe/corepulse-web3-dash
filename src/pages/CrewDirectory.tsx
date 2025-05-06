@@ -10,7 +10,6 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { supabase } from '@/integrations/supabase/client';
 
 // Define types for crews and crew members
 type Crew = {
@@ -24,13 +23,61 @@ type Crew = {
   };
 };
 
-type CrewMember = {
-  id: string;
-  user_id: string;
-  crew_id: string;
-};
-
 type SortOption = 'newest' | 'most_members' | 'most_mined';
+
+// Mock data for crews
+const MOCK_CREWS: Crew[] = [
+  {
+    id: '1',
+    name: 'Wave Riders',
+    created_at: '2023-08-15T10:00:00Z',
+    created_by: 'user1',
+    _count: {
+      members: 24,
+      total_mined: 12500
+    }
+  },
+  {
+    id: '2',
+    name: 'Crypto Miners',
+    created_at: '2023-09-20T14:30:00Z',
+    created_by: 'user2',
+    _count: {
+      members: 18,
+      total_mined: 8750
+    }
+  },
+  {
+    id: '3',
+    name: 'Blockchain Pioneers',
+    created_at: '2023-10-05T09:15:00Z',
+    created_by: 'user3',
+    _count: {
+      members: 32,
+      total_mined: 21000
+    }
+  },
+  {
+    id: '4',
+    name: 'Digital Nomads',
+    created_at: '2023-11-12T11:45:00Z',
+    created_by: 'user4',
+    _count: {
+      members: 15,
+      total_mined: 6200
+    }
+  },
+  {
+    id: '5',
+    name: 'Web3 Warriors',
+    created_at: '2024-01-03T16:20:00Z',
+    created_by: 'user5',
+    _count: {
+      members: 27,
+      total_mined: 15300
+    }
+  }
+];
 
 const CrewDirectory = () => {
   const [crews, setCrews] = useState<Crew[]>([]);
@@ -49,78 +96,23 @@ const CrewDirectory = () => {
       try {
         setIsLoading(true);
         
-        // Fetch all crews with member count and total mined aggregation
-        const { data: crewsData, error: crewsError } = await supabase
-          .from('crews')
-          .select('*');
-
-        if (crewsError) throw crewsError;
-
-        // For each crew, get member count and total mined
-        const crewsWithStats = await Promise.all(
-          crewsData.map(async (crew) => {
-            // Get member count
-            const { count: membersCount } = await supabase
-              .from('crew_members')
-              .select('id', { count: 'exact', head: true })
-              .eq('crew_id', crew.id);
-              
-            // Get sum of total_mined from users who are crew members
-            // Fix: Ensure proper typing of the RPC function call
-            const { data: minerData, error: minerError } = await supabase
-              .rpc('get_crew_total_mined', { crew_id: crew.id }) as { data: number | null, error: any };
-            
-            if (minerError) {
-              console.error('Error getting crew total mined:', minerError);
-            }
-            
-            const totalMined = minerData || 0;
-              
-            return { 
-              ...crew, 
-              _count: { 
-                members: membersCount || 0,
-                total_mined: totalMined 
-              } 
-            };
-          })
-        );
-
-        setCrews(crewsWithStats);
-        setFilteredCrews(crewsWithStats);
-
-        // If user is connected, check if they belong to a crew
-        if (isConnected && address) {
-          const { data: userData } = await supabase
-            .from('users')
-            .select('id')
-            .eq('wallet_address', address.toLowerCase())
-            .single();
-            
-          if (userData) {
-            const { data: crewMemberData } = await supabase
-              .from('crew_members')
-              .select('crew_id')
-              .eq('user_id', userData.id)
-              .single();
-              
-            if (crewMemberData) {
-              setUserCrewId(crewMemberData.crew_id);
-            }
-          }
-        }
+        // Use mock data instead of database query
+        setTimeout(() => {
+          setCrews(MOCK_CREWS);
+          setFilteredCrews(sortCrews(MOCK_CREWS, sortBy));
+          setIsLoading(false);
+        }, 800); // Simulate loading delay
       } catch (error) {
         console.error('Error fetching crews:', error);
         toast("Error loading crews", {
           description: "Please try again later.",
         });
-      } finally {
         setIsLoading(false);
       }
     };
 
     fetchCrews();
-  }, [isConnected, address]);
+  }, [sortBy]);
 
   // Handle search and filtering
   useEffect(() => {
@@ -170,54 +162,12 @@ const CrewDirectory = () => {
         return;
       }
       
-      // First, get the user id from the wallet address
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('wallet_address', address!.toLowerCase())
-        .single();
-        
-      if (userError || !userData) {
-        // User doesn't exist yet, create one
-        const { data: newUser, error: createError } = await supabase
-          .from('users')
-          .insert({
-            wallet_address: address!.toLowerCase(),
-          })
-          .select('id')
-          .single();
-          
-        if (createError || !newUser) {
-          throw new Error('Failed to create user profile');
-        }
-        
-        const { error: joinError } = await supabase
-          .from('crew_members')
-          .insert({
-            user_id: newUser.id,
-            crew_id: crewId,
-          });
-          
-        if (joinError) throw joinError;
-
-        // Log the activity
-        await logActivity('join_crew', { crew_id: crewId, crew_name: crewName });
-      } else {
-        // User exists, add them to the crew
-        const { error: joinError } = await supabase
-          .from('crew_members')
-          .insert({
-            user_id: userData.id,
-            crew_id: crewId,
-          });
-          
-        if (joinError) throw joinError;
-        
-        // Log the activity
-        await logActivity('join_crew', { crew_id: crewId, crew_name: crewName });
-      }
-      
+      // Mock joining a crew instead of database operations
       setUserCrewId(crewId);
+      
+      // Log the activity
+      logActivity('join_crew', { crew_id: crewId, crew_name: crewName });
+      
       toast("Crew Joined!", {
         description: `You have successfully joined ${crewName}!`,
       });
