@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
@@ -20,8 +19,7 @@ const Navbar = () => {
     { title: "Dashboard", href: "/dashboard" },
     { title: "Mint NFT", href: "/mint" },
     { title: "Leaderboard", href: "/leaderboard" },
-    { title: "Crew", href: "/crews" },
-    { title: "Lore & Challenges", href: "/lore" }
+    { title: "Crew", href: "/crews" }
   ];
 
   const isActive = (path: string) => {

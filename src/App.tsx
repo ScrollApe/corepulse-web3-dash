@@ -10,7 +10,6 @@ import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Mint from "./pages/Mint";
 import Leaderboard from "./pages/Leaderboard";
-import Lore from "./pages/Lore";
 import NotFound from "./pages/NotFound";
 import CrewDirectory from "./pages/CrewDirectory";
 
@@ -41,7 +40,6 @@ const App = () => (
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/mint" element={<Mint />} />
               <Route path="/leaderboard" element={<Leaderboard />} />
-              <Route path="/lore" element={<Lore />} />
               <Route path="/crews" element={<CrewDirectory />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
