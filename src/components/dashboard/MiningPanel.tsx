@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,7 +25,6 @@ const MiningPanel = () => {
   const { connect } = useWalletConnect();
   const { logActivity } = useActivity();
   
-  // Update user verification status when wallet is connected
   useEffect(() => {
     if (isConnected && address) {
       console.log("Wallet connected:", address);
@@ -37,7 +35,6 @@ const MiningPanel = () => {
     }
   }, [isConnected, address]);
 
-  // Handle mining calculation
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
     
@@ -55,7 +52,7 @@ const MiningPanel = () => {
     };
   }, [isMining, rate]);
 
-  // Start mining session without database interaction
+  // Start mining session with hybrid activity logging
   const startMiningSession = async () => {
     if (!isConnected || !address) {
       connect();
@@ -83,13 +80,11 @@ const MiningPanel = () => {
       setSessionStartTime(new Date());
       setIsMining(true);
       
-      // Log activity (in memory only)
-      logActivity('start_mining', { timestamp: new Date().toISOString() });
-      
-      toast("Mining Started", {
-        description: "Your mining session has begun!",
+      // Log activity using the hybrid approach
+      await logActivity('start_mining', { 
+        timestamp: new Date().toISOString(),
+        rate: rate
       });
-      
     } catch (error) {
       console.error('Error in startMiningSession:', error);
       toast("Error", {
@@ -100,6 +95,7 @@ const MiningPanel = () => {
     }
   };
 
+  // Stop mining session with hybrid activity logging
   const stopMiningSession = async () => {
     if (!sessionStartTime) return;
     
@@ -120,8 +116,8 @@ const MiningPanel = () => {
         };
       });
       
-      // Log activity
-      logActivity('stop_mining', { 
+      // Log activity using the hybrid approach
+      await logActivity('stop_mining', { 
         duration: durationMinutes,
         earned: earned.toFixed(6)
       });
@@ -129,12 +125,6 @@ const MiningPanel = () => {
       // Reset state
       setIsMining(false);
       setSessionStartTime(null);
-      
-      // Show success toast
-      toast("Mining Stopped", {
-        description: `You earned ${earned.toFixed(6)} WAVES in ${durationMinutes} minutes!`,
-      });
-      
     } catch (error) {
       console.error('Error in stopMiningSession:', error);
       setIsMining(false);

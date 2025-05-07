@@ -2,8 +2,9 @@
 import React from 'react';
 import { useActivitiesFeed } from '@/hooks/useActivitiesFeed';
 import { formatDistance } from 'date-fns';
-import { Activity, CircleAlert, Users, Pickaxe, Gift, PlusCircle } from 'lucide-react';
+import { Activity, CircleAlert, Users, Pickaxe, Gift, PlusCircle, Link as ChainLink } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface ActivityFeedProps {
   global?: boolean;
@@ -33,8 +34,8 @@ const ActivityFeed = ({ global = false, limit = 10 }: ActivityFeedProps) => {
   };
 
   const getActivityText = (activity: any) => {
-    const truncatedAddress = activity.users?.wallet_address 
-      ? `${activity.users.wallet_address.slice(0, 6)}...${activity.users.wallet_address.slice(-4)}`
+    const truncatedAddress = activity.user_id 
+      ? `${activity.user_id.slice(0, 6)}...${activity.user_id.slice(-4)}`
       : 'Unknown';
     
     switch (activity.activity) {
@@ -86,7 +87,26 @@ const ActivityFeed = ({ global = false, limit = 10 }: ActivityFeedProps) => {
                 {getActivityIcon(activity.activity)}
               </div>
               <div className="flex-1">
-                <p className="text-sm text-corepulse-gray-700">{getActivityText(activity)}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-corepulse-gray-700">{getActivityText(activity)}</p>
+                  {activity.is_on_chain && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <div className="bg-corepulse-orange bg-opacity-10 rounded-full p-1 text-corepulse-orange">
+                            <ChainLink className="h-3 w-3" />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>On-chain activity</p>
+                          {activity.tx_hash && (
+                            <p className="text-xs">TX: {activity.tx_hash.slice(0, 10)}...</p>
+                          )}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </div>
                 <p className="text-xs text-corepulse-gray-500">
                   {formatDistance(new Date(activity.created_at), new Date(), { addSuffix: true })}
                 </p>
